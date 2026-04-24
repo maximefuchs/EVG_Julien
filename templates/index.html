@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Classement – EVG{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+
+  <!-- Header -->
+  <div class="text-center mb-5">
+    <h1 class="display-4 fw-900" style="color:var(--gold);letter-spacing:3px;">CLASSEMENT</h1>
+    <p class="text-muted">Mis à jour en temps réel</p>
+  </div>
+
+  <!-- Day filter tabs -->
+  <ul class="nav filter-tabs justify-content-center mb-4">
+    <li class="nav-item">
+      <a class="nav-link {% if jour == 'tous' %}active{% endif %}"
+         href="{{ url_for('index') }}">Tout le week-end</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if jour == 'samedi' %}active{% endif %}"
+         href="{{ url_for('index', jour='samedi') }}">Samedi</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if jour == 'dimanche' %}active{% endif %}"
+         href="{{ url_for('index', jour='dimanche') }}">Dimanche</a>
+    </li>
+  </ul>
+
+  <!-- Leaderboard table -->
+  <div class="card mx-auto" style="max-width:700px;">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Classement individuel</span>
+      <span id="refresh-indicator" class="text-muted">Auto-actualisation toutes les 30s</span>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-borderless leaderboard-table mb-0">
+        <thead>
+          <tr>
+            <th class="text-center" style="width:60px;">#</th>
+            <th>Joueur</th>
+            <th class="text-center">Points</th>
+            <th class="text-center">Jeux</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard-tbody">
+          {% for entry in leaderboard %}
+          <tr {% if loop.first and entry.total_points > 0 %}class="row-leader"{% endif %}>
+            <td class="text-center">
+              {% if entry.rank == 1 %}<span class="rank-1">🥇</span>
+              {% elif entry.rank == 2 %}<span class="rank-2">🥈</span>
+              {% elif entry.rank == 3 %}<span class="rank-3">🥉</span>
+              {% else %}<span class="rank-other">{{ entry.rank }}</span>{% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('joueur_detail', player_id=entry.id) }}"
+                 class="player-name-link">{{ entry.name }}</a>
+            </td>
+            <td class="text-center">
+              <span class="points-badge">{{ entry.total_points }} pts</span>
+            </td>
+            <td class="text-center text-muted">{{ entry.games_played }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="4" class="text-center text-muted py-5">
+              Aucun score enregistré pour le moment.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

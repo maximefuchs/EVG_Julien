@@ -1,0 +1,117 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Tableau de bord – Admin EVG{% endblock %}
+
+{% block content %}
+<h2 class="mb-4" style="color:var(--gold)">Tableau de bord</h2>
+
+<div class="row g-4 mb-5">
+
+  <!-- Quick stats -->
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div style="font-size:2rem;font-weight:900;color:var(--gold)">{{ total_players }}</div>
+      <div class="text-muted small">Joueurs</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div style="font-size:2rem;font-weight:900;color:#2980b9">{{ games|length }}</div>
+      <div class="text-muted small">Jeux créés</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div style="font-size:2rem;font-weight:900;color:#27ae60">
+        {{ games|selectattr('status','eq','termine')|list|length }}
+      </div>
+      <div class="text-muted small">Jeux terminés</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div style="font-size:2rem;font-weight:900;color:var(--accent)">{{ en_cours|length }}</div>
+      <div class="text-muted small">En cours</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- Top 5 -->
+  <div class="col-12 col-md-6">
+    <div class="card h-100">
+      <div class="card-header">Top 5 actuel</div>
+      <div class="card-body p-0">
+        {% if top5 %}
+        <table class="table leaderboard-table mb-0">
+          <tbody>
+            {% for entry in top5 %}
+            <tr>
+              <td class="text-center" style="width:50px;">
+                {% if entry.rank == 1 %}<span class="rank-1">🥇</span>
+                {% elif entry.rank == 2 %}<span class="rank-2">🥈</span>
+                {% elif entry.rank == 3 %}<span class="rank-3">🥉</span>
+                {% else %}<span class="rank-other">{{ entry.rank }}</span>{% endif %}
+              </td>
+              <td>{{ entry.name }}</td>
+              <td class="text-end"><span class="points-badge">{{ entry.total_points }} pts</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-center text-muted py-4">Aucun score pour le moment.</p>
+        {% endif %}
+      </div>
+      <div class="card-footer text-end">
+        <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-secondary">Classement complet</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Jeux en cours / actions rapides -->
+  <div class="col-12 col-md-6">
+    <div class="card h-100">
+      <div class="card-header">Actions rapides</div>
+      <div class="card-body">
+
+        {% if en_cours %}
+        <h6 class="text-muted mb-2">Jeux en cours</h6>
+        {% for game in en_cours %}
+        <a href="{{ url_for('admin_jeu_detail', game_id=game.id) }}"
+           class="btn btn-sm btn-outline-warning mb-2 me-2">
+          🎮 {{ game.name }} ({{ game.day }})
+        </a>
+        {% endfor %}
+        <hr>
+        {% endif %}
+
+        <!-- Nouveau jeu rapide -->
+        <h6 class="text-muted mb-2">Créer un jeu</h6>
+        <form method="POST" action="{{ url_for('admin_jeux_nouveau') }}" class="row g-2">
+          <div class="col-12">
+            <input type="text" name="name" class="form-control form-control-sm"
+                   placeholder="Nom du jeu" required>
+          </div>
+          <div class="col-6">
+            <select name="day" class="form-select form-select-sm" required>
+              <option value="samedi">Samedi</option>
+              <option value="dimanche">Dimanche</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <select name="type" class="form-select form-select-sm" required>
+              <option value="mini_jeu">Mini jeu</option>
+              <option value="karting">Karting</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-gold btn-sm w-100">Créer →</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

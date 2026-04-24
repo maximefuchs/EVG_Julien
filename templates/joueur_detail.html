@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ player.name }} – EVG{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-secondary mb-4">← Retour au classement</a>
+
+  <div class="card mx-auto" style="max-width:700px;">
+    <div class="card-header">
+      <h4 class="mb-0">{{ player.name }}</h4>
+    </div>
+    <div class="card-body">
+      <div class="text-center mb-4">
+        <span class="points-badge" style="font-size:1.4rem;padding:8px 24px;">
+          {{ total }} pts au total
+        </span>
+      </div>
+
+      {% if breakdown %}
+      <table class="table breakdown-table">
+        <thead>
+          <tr>
+            <th>Jeu</th>
+            <th>Jour</th>
+            <th>Équipe</th>
+            <th class="text-center">Place</th>
+            <th class="text-center">Points</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in breakdown %}
+          <tr>
+            <td>{{ b.game_name }}</td>
+            <td>{{ b.day|capitalize }}</td>
+            <td>{{ b.team_name }}</td>
+            <td class="text-center">{{ b.placement }}e</td>
+            <td class="text-center">
+              <span class="points-badge" style="font-size:0.85rem;">+{{ b.points }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="text-center text-muted py-3">Aucun résultat enregistré pour ce joueur.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

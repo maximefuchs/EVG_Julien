@@ -1,0 +1,89 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Jeux – Admin EVG{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 style="color:var(--gold)">Jeux</h2>
+  <button class="btn btn-gold" data-bs-toggle="modal" data-bs-target="#modalNouveauJeu">
+    + Nouveau jeu
+  </button>
+</div>
+
+{% macro game_card(game) %}
+<div class="card mb-3">
+  <div class="card-body d-flex justify-content-between align-items-center">
+    <div>
+      <strong>{{ game.name }}</strong>
+      <span class="badge ms-2
+        {% if game.type == 'karting' %}bg-warning text-dark{% else %}bg-primary{% endif %}">
+        {{ 'Karting' if game.type == 'karting' else 'Mini jeu' }}
+      </span>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge badge-{{ game.status }}">
+        {% if game.status == 'en_attente' %}En attente
+        {% elif game.status == 'en_cours' %}En cours
+        {% else %}Terminé{% endif %}
+      </span>
+      <a href="{{ url_for('admin_jeu_detail', game_id=game.id) }}"
+         class="btn btn-sm btn-outline-secondary">Gérer →</a>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+<!-- Samedi -->
+<h5 class="text-muted mb-3">Samedi</h5>
+{% if samedi %}
+  {% for game in samedi %}{{ game_card(game) }}{% endfor %}
+{% else %}
+  <p class="text-muted fst-italic mb-4">Aucun jeu pour le samedi.</p>
+{% endif %}
+
+<!-- Dimanche -->
+<h5 class="text-muted mb-3 mt-4">Dimanche</h5>
+{% if dimanche %}
+  {% for game in dimanche %}{{ game_card(game) }}{% endfor %}
+{% else %}
+  <p class="text-muted fst-italic">Aucun jeu pour le dimanche.</p>
+{% endif %}
+
+<!-- Modal nouveau jeu -->
+<div class="modal fade" id="modalNouveauJeu" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="background:#1a1a2e;color:#e0e0e0;">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Nouveau jeu</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('admin_jeux_nouveau') }}">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Nom du jeu</label>
+            <input type="text" name="name" class="form-control" required
+                   placeholder="Ex : Beer pong, Course en sac…">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Jour</label>
+            <select name="day" class="form-select" required>
+              <option value="samedi">Samedi</option>
+              <option value="dimanche">Dimanche</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Type</label>
+            <select name="type" class="form-select" required>
+              <option value="mini_jeu">Mini jeu</option>
+              <option value="karting">Karting</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="submit" class="btn btn-gold">Créer et configurer →</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

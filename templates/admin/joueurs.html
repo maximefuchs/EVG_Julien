@@ -1,0 +1,94 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Joueurs – Admin EVG{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 style="color:var(--gold)">Joueurs</h2>
+  <span class="text-muted">{{ players|length }} joueur(s)</span>
+</div>
+
+<div class="row g-4">
+
+  <!-- Add player -->
+  <div class="col-12 col-md-4">
+    <div class="card">
+      <div class="card-header">Ajouter un joueur</div>
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="action" value="ajouter">
+          <div class="mb-3">
+            <input type="text" name="name" class="form-control"
+                   placeholder="Prénom ou pseudo" required>
+          </div>
+          <button type="submit" class="btn btn-gold w-100">Ajouter</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Player list -->
+  <div class="col-12 col-md-8">
+    <div class="card">
+      <div class="card-header">Liste des joueurs</div>
+      <div class="card-body p-0">
+        {% if players %}
+        <table class="table table-borderless mb-0" style="color:#e0e0e0;">
+          <tbody>
+            {% for player in players %}
+            <tr style="border-bottom:1px solid #2a2a4a;">
+              <td class="align-middle ps-3">
+                <strong>{{ player.name }}</strong>
+              </td>
+              <td class="text-end pe-3">
+                <!-- Rename -->
+                <button class="btn btn-sm btn-outline-secondary me-1"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalRename{{ player.id }}">
+                  Renommer
+                </button>
+                <!-- Delete -->
+                <form method="POST" class="d-inline"
+                      onsubmit="return confirm('Supprimer {{ player.name }} ?')">
+                  <input type="hidden" name="action" value="supprimer">
+                  <input type="hidden" name="player_id" value="{{ player.id }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">✕</button>
+                </form>
+              </td>
+            </tr>
+
+            <!-- Rename modal -->
+            <div class="modal fade" id="modalRename{{ player.id }}" tabindex="-1">
+              <div class="modal-dialog modal-sm">
+                <div class="modal-content" style="background:#1a1a2e;color:#e0e0e0;">
+                  <div class="modal-header border-secondary">
+                    <h6 class="modal-title">Renommer {{ player.name }}</h6>
+                    <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"></button>
+                  </div>
+                  <form method="POST">
+                    <div class="modal-body">
+                      <input type="hidden" name="action" value="renommer">
+                      <input type="hidden" name="player_id" value="{{ player.id }}">
+                      <input type="text" name="name" class="form-control"
+                             value="{{ player.name }}" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                      <button type="submit" class="btn btn-gold btn-sm">Sauvegarder</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-center text-muted py-4">Aucun joueur enregistré.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
