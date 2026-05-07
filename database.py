@@ -29,17 +29,18 @@ def init_db():
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 name       TEXT NOT NULL,
                 day        TEXT NOT NULL CHECK(day IN ('samedi','dimanche')),
-                type       TEXT NOT NULL CHECK(type IN ('mini_jeu','karting')),
+                type       TEXT NOT NULL CHECK(type IN ('mini_jeu','karting','mini_jeu_ind')),
                 status     TEXT NOT NULL DEFAULT 'en_attente'
                                CHECK(status IN ('en_attente','en_cours','termine')),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS game_teams (
-                id        INTEGER PRIMARY KEY AUTOINCREMENT,
-                game_id   INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-                name      TEXT NOT NULL,
-                placement INTEGER
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id        INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+                name           TEXT NOT NULL,
+                placement      INTEGER,
+                points_override INTEGER
             );
 
             CREATE TABLE IF NOT EXISTS team_players (
@@ -50,26 +51,47 @@ def init_db():
 
             CREATE TABLE IF NOT EXISTS score_config (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                game_type  TEXT NOT NULL CHECK(game_type IN ('mini_jeu','karting')),
+                game_type  TEXT NOT NULL CHECK(game_type IN ('mini_jeu','karting','mini_jeu_ind')),
                 placement  INTEGER NOT NULL,
                 points     INTEGER NOT NULL DEFAULT 0,
                 UNIQUE(game_type, placement)
             );
         """)
 
+        # Migration: add points_override column if it doesn't exist yet
+        cols = [r[1] for r in db.execute("PRAGMA table_info(game_teams)").fetchall()]
+        if "points_override" not in cols:
+            db.execute("ALTER TABLE game_teams ADD COLUMN points_override INTEGER")
+
         # Default score config (only inserted if table is empty)
         existing = db.execute("SELECT COUNT(*) FROM score_config").fetchone()[0]
         if existing == 0:
             defaults = [
-                ("mini_jeu", 1, 5), ("mini_jeu", 2, 4), ("mini_jeu", 3, 3),
-                ("mini_jeu", 4, 2), ("mini_jeu", 5, 1), ("mini_jeu", 6, 0),
-                ("karting",  1, 10), ("karting",  2, 8), ("karting",  3, 6),
-                ("karting",  4, 4), ("karting",  5, 2), ("karting",  6, 1),
+                ("mini_jeu",     1, 5), ("mini_jeu",     2, 4), ("mini_jeu",     3, 3),
+                ("mini_jeu",     4, 2), ("mini_jeu",     5, 1), ("mini_jeu",     6, 0),
+                ("karting",      1, 10), ("karting",     2, 8), ("karting",      3, 6),
+                ("karting",      4, 4), ("karting",      5, 2), ("karting",      6, 1),
+                ("mini_jeu_ind", 1, 5), ("mini_jeu_ind", 2, 4), ("mini_jeu_ind", 3, 3),
+                ("mini_jeu_ind", 4, 2), ("mini_jeu_ind", 5, 1), ("mini_jeu_ind", 6, 0),
             ]
             db.executemany(
                 "INSERT INTO score_config (game_type, placement, points) VALUES (?,?,?)",
                 defaults
             )
+        else:
+            # Ensure mini_jeu_ind defaults exist for existing databases
+            ind_existing = db.execute(
+                "SELECT COUNT(*) FROM score_config WHERE game_type='mini_jeu_ind'"
+            ).fetchone()[0]
+            if ind_existing == 0:
+                ind_defaults = [
+                    ("mini_jeu_ind", 1, 5), ("mini_jeu_ind", 2, 4), ("mini_jeu_ind", 3, 3),
+                    ("mini_jeu_ind", 4, 2), ("mini_jeu_ind", 5, 1), ("mini_jeu_ind", 6, 0),
+                ]
+                db.executemany(
+                    "INSERT INTO score_config (game_type, placement, points) VALUES (?,?,?)",
+                    ind_defaults
+                )
 
         db.commit()
 
@@ -88,7 +110,7 @@ def get_leaderboard(day=None):
             SELECT
                 p.id,
                 p.name,
-                COALESCE(SUM(COALESCE(sc.points, 0)), 0) AS total_points,
+                COALESCE(SUM(COALESCE(gt.points_override, sc.points, 0)), 0) AS total_points,
                 COUNT(DISTINCT CASE WHEN g.status = 'termine' THEN g.id END) AS games_played
             FROM players p
             LEFT JOIN team_players tp ON tp.player_id = p.id
@@ -115,7 +137,7 @@ def get_player_game_breakdown(player_id):
                 g.type,
                 gt.name AS team_name,
                 gt.placement,
-                COALESCE(sc.points, 0) AS points
+                COALESCE(gt.points_override, COALESCE(sc.points, 0)) AS points
             FROM team_players tp
             JOIN game_teams gt   ON gt.id = tp.team_id AND gt.placement IS NOT NULL
             JOIN games g         ON g.id = gt.game_id  AND g.status = 'termine'
@@ -280,15 +302,19 @@ def save_teams(game_id, teams_data):
         db.commit()
 
 
-def save_results(game_id, placements):
+def save_results(game_id, placements, overrides=None):
     """
     placements: dict {team_id: placement_int}
+    overrides:  dict {team_id: points_int or None}
     """
+    if overrides is None:
+        overrides = {}
     with get_db() as db:
         for team_id, placement in placements.items():
+            override = overrides.get(team_id)
             db.execute(
-                "UPDATE game_teams SET placement=? WHERE id=? AND game_id=?",
-                [placement, team_id, game_id])
+                "UPDATE game_teams SET placement=?, points_override=? WHERE id=? AND game_id=?",
+                [placement, override, team_id, game_id])
         db.execute("UPDATE games SET status='termine' WHERE id=?", [game_id])
         db.commit()
 

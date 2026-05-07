@@ -216,7 +216,7 @@ def admin_jeux_nouveau():
     name      = request.form.get("name", "").strip()
     day       = request.form.get("day")
     game_type = request.form.get("type")
-    if not name or day not in ("samedi", "dimanche") or game_type not in ("mini_jeu", "karting"):
+    if not name or day not in ("samedi", "dimanche") or game_type not in ("mini_jeu", "karting", "mini_jeu_ind"):
         flash("Données invalides.", "danger")
         return redirect(url_for("admin_jeux"))
     game_id = db.create_game(name, day, game_type)
@@ -294,14 +294,17 @@ def admin_jeu_resultats(game_id):
         return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
     placements = {}
+    overrides = {}
     for team in teams:
         val = request.form.get(f"placement_{team['id']}", "").strip()
         if not val.isdigit() or int(val) < 1:
             flash("Tous les placements doivent être des nombres entiers ≥ 1.", "danger")
             return redirect(url_for("admin_jeu_detail", game_id=game_id))
         placements[team["id"]] = int(val)
+        ov = request.form.get(f"points_override_{team['id']}", "").strip()
+        overrides[team["id"]] = int(ov) if ov.lstrip("-").isdigit() else None
 
-    db.save_results(game_id, placements)
+    db.save_results(game_id, placements, overrides)
     flash("Résultats enregistrés. Le leaderboard a été mis à jour.", "success")
     return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
@@ -342,7 +345,7 @@ def admin_configuration():
 
         if action == "sauvegarder":
             game_type = request.form.get("game_type")
-            if game_type not in ("mini_jeu", "karting"):
+            if game_type not in ("mini_jeu", "karting", "mini_jeu_ind"):
                 flash("Type de jeu invalide.", "danger")
                 return redirect(url_for("admin_configuration"))
             placements = request.form.getlist("placement[]")
@@ -355,7 +358,7 @@ def admin_configuration():
         elif action == "supprimer_ligne":
             game_type = request.form.get("game_type")
             placement = request.form.get("placement")
-            if game_type in ("mini_jeu", "karting") and str(placement).isdigit():
+            if game_type in ("mini_jeu", "karting", "mini_jeu_ind") and str(placement).isdigit():
                 db.delete_score_config_row(game_type, int(placement))
                 flash("Ligne supprimée.", "success")
 
@@ -363,8 +366,9 @@ def admin_configuration():
 
     mini_cfg    = db.get_score_config("mini_jeu")
     karting_cfg = db.get_score_config("karting")
+    ind_cfg     = db.get_score_config("mini_jeu_ind")
     return render_template("admin/configuration.html",
-                           mini_cfg=mini_cfg, karting_cfg=karting_cfg)
+                           mini_cfg=mini_cfg, karting_cfg=karting_cfg, ind_cfg=ind_cfg)
 
 
 # ---------------------------------------------------------------------------

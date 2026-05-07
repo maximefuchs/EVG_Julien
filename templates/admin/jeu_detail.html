@@ -9,8 +9,12 @@
     <a href="{{ url_for('admin_jeux') }}" class="btn btn-sm btn-outline-secondary mb-2">← Retour</a>
     <h2 style="color:var(--gold)">{{ game.name }}</h2>
     <span class="badge
-      {% if game.type == 'karting' %}bg-warning text-dark{% else %}bg-primary{% endif %} me-2">
-      {{ 'Karting' if game.type == 'karting' else 'Mini jeu' }}
+      {% if game.type == 'karting' %}bg-warning text-dark
+      {% elif game.type == 'mini_jeu_ind' %}bg-success
+      {% else %}bg-primary{% endif %} me-2">
+      {% if game.type == 'karting' %}Karting
+      {% elif game.type == 'mini_jeu_ind' %}Mini jeu individuel
+      {% else %}Mini jeu{% endif %}
     </span>
     <span class="badge
       {% if game.day == 'samedi' %}bg-secondary{% else %}bg-info text-dark{% endif %} me-2">
@@ -46,6 +50,8 @@
   <div class="card-header">
     {% if game.type == 'karting' %}
       Participants – Karting (chaque joueur court individuellement)
+    {% elif game.type == 'mini_jeu_ind' %}
+      Participants – Mini jeu individuel (chaque joueur joue seul)
     {% else %}
       Équipes
     {% endif %}
@@ -92,7 +98,7 @@
             <div class="team-title">
               <input type="text" class="form-control form-control-sm d-inline-block w-auto"
                      name="team_name_1"
-                     value="{{ 'Équipe 1' if game.type != 'karting' else 'Karting' }}"
+                     value="{{ 'Équipe 1' if game.type == 'mini_jeu' else 'Karting' }}"
                      required
                      style="background:#1a1a3a;color:#fff;border-color:#444;font-weight:700;">
             </div>
@@ -112,7 +118,7 @@
         {% endif %}
       </div>
 
-      {% if game.type != 'karting' %}
+      {% if game.type == 'mini_jeu' %}
       <button type="button" id="btn-add-team" class="btn btn-outline-secondary btn-sm mt-2">
         + Ajouter une équipe
       </button>
@@ -139,7 +145,7 @@
       <table class="table" style="color:#e0e0e0;border-color:#2a2a4a;">
         <thead>
           <tr style="border-color:#2a2a4a;">
-            <th>Équipe / Joueur</th>
+            <th>{% if game.type != 'mini_jeu' %}Joueur{% else %}Équipe{% endif %}</th>
             <th>Membres</th>
             <th class="text-center">Place</th>
             <th class="text-center">Points attribués</th>
@@ -156,10 +162,18 @@
               {% if team.placement %}{{ team.placement }}e{% else %}–{% endif %}
             </td>
             <td class="text-center">
-              {% set pts = score_cfg | selectattr('placement','eq', team.placement) | list %}
-              {% if pts %}
-                <span class="points-badge">+{{ pts[0].points }}</span>
-              {% else %}–{% endif %}
+              {% if team.points_override is not none and team.points_override != '' %}
+                <span class="points-badge">+{{ team.points_override }}</span>
+                {% set pts = score_cfg | selectattr('placement','eq', team.placement) | list %}
+                {% if pts %}
+                  <span class="text-muted small ms-1">(défaut : {{ pts[0].points }})</span>
+                {% endif %}
+              {% else %}
+                {% set pts = score_cfg | selectattr('placement','eq', team.placement) | list %}
+                {% if pts %}
+                  <span class="points-badge">+{{ pts[0].points }}</span>
+                {% else %}–{% endif %}
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -180,10 +194,17 @@
     {% else %}
     <!-- Editable results form -->
     {% if game.status == 'en_cours' %}
+
+    <!-- Score config as JSON for JS widget -->
+    <script id="score-cfg-json" type="application/json">
+      {{ score_cfg | tojson }}
+    </script>
+
     <p class="text-muted small mb-3">
       Entrez le classement de chaque
-      {% if game.type == 'karting' %}joueur{% else %}équipe{% endif %}
+      {% if game.type != 'mini_jeu' %}joueur{% else %}équipe{% endif %}
       (1 = premier, 2 = deuxième…).
+      Les points sont pré-remplis selon la configuration, mais vous pouvez les ajuster.
     </p>
 
     <form method="POST" action="{{ url_for('admin_jeu_resultats', game_id=game.id) }}">
@@ -191,9 +212,10 @@
         <table class="table" style="color:#e0e0e0;border-color:#2a2a4a;">
           <thead>
             <tr style="border-color:#2a2a4a;">
-              <th>{% if game.type == 'karting' %}Joueur{% else %}Équipe{% endif %}</th>
+              <th>{% if game.type != 'mini_jeu' %}Joueur{% else %}Équipe{% endif %}</th>
               <th>Membres</th>
-              <th class="text-center" style="width:120px;">Place</th>
+              <th class="text-center" style="width:110px;">Place</th>
+              <th class="text-center" style="width:160px;">Points</th>
             </tr>
           </thead>
           <tbody>
@@ -205,10 +227,34 @@
               </td>
               <td class="text-center">
                 <input type="number" name="placement_{{ team.id }}"
-                       class="form-control form-control-sm text-center d-inline-block"
+                       class="form-control form-control-sm text-center d-inline-block placement-input"
                        style="width:70px;"
                        min="1" max="{{ teams|length }}"
-                       value="{{ team.placement or '' }}" required>
+                       value="{{ team.placement or '' }}"
+                       data-team-id="{{ team.id }}"
+                       required>
+              </td>
+              <td class="text-center">
+                {# Determine starting value: use existing override if present, else look up default #}
+                {% set existing_override = team.points_override %}
+                {% set default_pts_list = score_cfg | selectattr('placement','eq', team.placement) | list %}
+                {% set default_pts = default_pts_list[0].points if default_pts_list else 0 %}
+                {% set display_pts = existing_override if existing_override is not none else default_pts %}
+                <div class="d-flex align-items-center justify-content-center gap-1 points-widget"
+                     data-team-id="{{ team.id }}">
+                  <button type="button" class="btn btn-sm btn-outline-secondary btn-pts-minus"
+                          style="width:30px;padding:0 6px;">−</button>
+                  <span class="points-display fw-bold"
+                        style="min-width:36px;text-align:center;">{{ display_pts }}</span>
+                  <button type="button" class="btn btn-sm btn-outline-secondary btn-pts-plus"
+                          style="width:30px;padding:0 6px;">+</button>
+                  <input type="hidden"
+                         name="points_override_{{ team.id }}"
+                         class="points-override-input"
+                         value="{{ display_pts }}">
+                  <span class="text-muted small ms-1 default-pts-hint"
+                        data-default="{{ default_pts }}">(défaut)</span>
+                </div>
               </td>
             </tr>
             {% endfor %}
@@ -219,6 +265,64 @@
         Enregistrer les résultats et terminer le jeu
       </button>
     </form>
+
+    <script>
+    (function () {
+      const scoreCfg = JSON.parse(document.getElementById('score-cfg-json').textContent);
+
+      function defaultPts(placement) {
+        const row = scoreCfg.find(r => r.placement === placement);
+        return row ? row.points : 0;
+      }
+
+      // Sync points widget when placement input changes
+      document.querySelectorAll('.placement-input').forEach(function (input) {
+        input.addEventListener('input', function () {
+          const teamId = this.dataset.teamId;
+          const widget = document.querySelector(`.points-widget[data-team-id="${teamId}"]`);
+          if (!widget) return;
+          const placement = parseInt(this.value, 10);
+          if (!isNaN(placement)) {
+            const def = defaultPts(placement);
+            widget.querySelector('.points-display').textContent = def;
+            widget.querySelector('.points-override-input').value = def;
+            const hint = widget.querySelector('.default-pts-hint');
+            hint.dataset.default = def;
+            hint.textContent = '(défaut)';
+          }
+        });
+      });
+
+      // +/- buttons
+      document.querySelectorAll('.points-widget').forEach(function (widget) {
+        const display = widget.querySelector('.points-display');
+        const hiddenInput = widget.querySelector('.points-override-input');
+        const hint = widget.querySelector('.default-pts-hint');
+
+        function updateHint(val) {
+          const def = parseInt(hint.dataset.default, 10);
+          hint.textContent = val === def ? '(défaut)' : '(défaut : ' + def + ')';
+        }
+
+        widget.querySelector('.btn-pts-plus').addEventListener('click', function () {
+          let val = parseInt(display.textContent, 10);
+          val += 1;
+          display.textContent = val;
+          hiddenInput.value = val;
+          updateHint(val);
+        });
+
+        widget.querySelector('.btn-pts-minus').addEventListener('click', function () {
+          let val = parseInt(display.textContent, 10);
+          val -= 1;
+          display.textContent = val;
+          hiddenInput.value = val;
+          updateHint(val);
+        });
+      });
+    })();
+    </script>
+
     {% else %}
     <p class="text-muted">Démarrez le jeu pour pouvoir enregistrer les résultats.</p>
     {% endif %}
