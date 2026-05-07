@@ -19,8 +19,12 @@
           </div>
           <div class="mb-3">
             <label class="form-label small text-muted">Mot de passe</label>
-            <input type="password" name="password" class="form-control"
-                   minlength="4" required>
+            <div class="input-group">
+              <input type="password" name="password" id="new-admin-password"
+                     class="form-control" minlength="4" required>
+              <button type="button" class="btn btn-outline-secondary" id="toggle-admin-password"
+                      style="border-color:#444;color:#aaa;" title="Afficher / masquer">👁</button>
+            </div>
           </div>
           <button type="submit" class="btn btn-gold w-100">Créer</button>
         </form>
@@ -64,4 +68,10 @@
   </div>
 
 </div>
+<script>
+  document.getElementById('toggle-admin-password').addEventListener('click', function () {
+    const input = document.getElementById('new-admin-password');
+    input.type = input.type === 'password' ? 'text' : 'password';
+  });
+</script>
 {% endblock %}

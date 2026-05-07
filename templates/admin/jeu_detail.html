@@ -59,8 +59,9 @@
           id="teams-form">
 
       <div id="teams-container">
-        {% if teams %}
-          {% for team in teams %}
+        {% set display_teams = form_teams if form_teams is defined else teams %}
+        {% if display_teams %}
+          {% for team in display_teams %}
           {% set tidx = loop.index %}
           <div class="team-block">
             <div class="team-title">
@@ -116,6 +117,39 @@
         <button type="submit" class="btn btn-gold">Sauvegarder les équipes</button>
       </div>
     </form>
+
+    <script>
+    // When a player checkbox is checked in one team, uncheck+disable it in all other teams
+    (function () {
+      function syncPlayerCheckboxes() {
+        const allCheckboxes = document.querySelectorAll('.player-checkbox-list input[type=checkbox]');
+        // Build set of checked player IDs
+        const checkedIds = new Set();
+        allCheckboxes.forEach(cb => { if (cb.checked) checkedIds.add(cb.value); });
+        // For each checkbox: if another team has it checked, disable it here (unless it's the checked one itself)
+        allCheckboxes.forEach(cb => {
+          if (!cb.checked && checkedIds.has(cb.value)) {
+            cb.disabled = true;
+            cb.closest('.form-check').style.opacity = '0.35';
+          } else {
+            cb.disabled = false;
+            cb.closest('.form-check').style.opacity = '';
+          }
+        });
+      }
+
+      document.getElementById('teams-container').addEventListener('change', function (e) {
+        if (e.target.matches('input[type=checkbox]')) syncPlayerCheckboxes();
+      });
+
+      // Also sync when a team is added (delegated via MutationObserver)
+      new MutationObserver(syncPlayerCheckboxes).observe(
+        document.getElementById('teams-container'), { childList: true, subtree: true }
+      );
+
+      syncPlayerCheckboxes();
+    })();
+    </script>
 
   </div>
 </div>
@@ -233,7 +267,7 @@
             </tr>
           </thead>
           <tbody>
-            {% for team in teams %}
+          {% for team in display_teams %}
             {% set is_dnp = team.did_not_participate %}
             <tr style="border-color:#2a2a4a;" class="result-row" data-team-id="{{ team.id }}">
               <td><strong>{{ team.name }}</strong></td>
@@ -243,13 +277,17 @@
               </td>
               {% endif %}
               <td class="text-center placement-cell">
-                <input type="number" name="placement_{{ team.id }}"
-                       class="form-control form-control-sm text-center d-inline-block placement-input"
-                       style="width:70px;"
-                       min="1" max="{{ teams|length }}"
-                       value="{{ team.placement or '' }}"
-                       data-team-id="{{ team.id }}"
-                       {% if is_dnp %}disabled{% endif %}>
+                <select name="placement_{{ team.id }}"
+                        class="form-select form-select-sm text-center d-inline-block placement-input"
+                        style="width:80px;"
+                        data-team-id="{{ team.id }}"
+                        {% if is_dnp %}disabled{% endif %}
+                        required>
+                  <option value="">–</option>
+                  {% for i in range(1, teams|length + 1) %}
+                  <option value="{{ i }}" {% if team.placement == i %}selected{% endif %}>{{ i }}</option>
+                  {% endfor %}
+                </select>
               </td>
               <td class="text-center points-cell">
                 {% set existing_override = team.points_override %}
@@ -319,26 +357,53 @@
             pointsWidget.style.opacity = '';
             pointsWidget.style.pointerEvents = '';
           }
+          syncPlacementOptions();
         });
       });
 
-      // Sync points widget when placement input changes
+      // Sync points widget when placement SELECT changes
+      function syncPlacementOptions() {
+        const allSelects = Array.from(document.querySelectorAll('.placement-input'));
+        const activeSelects = allSelects.filter(s => !s.disabled);
+        const maxPlacement = activeSelects.length; // effective max = number of participating rows
+        const usedValues = new Set(activeSelects.map(s => s.value).filter(v => v !== ''));
+
+        allSelects.forEach(function (sel) {
+          if (sel.disabled) return;
+          const own = sel.value;
+          Array.from(sel.options).forEach(function (opt) {
+            if (opt.value === '') {
+              opt.hidden = false;
+            } else {
+              const num = parseInt(opt.value, 10);
+              // Hide if beyond current max OR already taken by another select
+              opt.hidden = num > maxPlacement || (usedValues.has(opt.value) && opt.value !== own);
+            }
+          });
+          // If current value is now out of range, reset it
+          if (own !== '' && parseInt(own, 10) > maxPlacement) {
+            sel.value = '';
+            syncPlacementOptions(); // recurse to update used set
+          }
+        });
+      }
+
       document.querySelectorAll('.placement-input').forEach(function (input) {
-        input.addEventListener('input', function () {
+        input.addEventListener('change', function () {
           const teamId = this.dataset.teamId;
           const widget = document.querySelector(`.points-widget[data-team-id="${teamId}"]`);
+          syncPlacementOptions();
           if (!widget) return;
           const placement = parseInt(this.value, 10);
           if (!isNaN(placement)) {
             const def = defaultPts(placement);
             widget.querySelector('.points-display').textContent = def;
             widget.querySelector('.points-override-input').value = def;
-            const hint = widget.querySelector('.default-pts-hint');
-            hint.dataset.default = def;
-            hint.textContent = '(défaut)';
           }
         });
       });
+
+      syncPlacementOptions();
 
       // +/- buttons
       document.querySelectorAll('.points-widget').forEach(function (widget) {

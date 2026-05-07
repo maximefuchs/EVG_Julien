@@ -277,6 +277,31 @@ def admin_jeu_equipes(game_id):
         flash("Aucune équipe fournie.", "warning")
         return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
+    error_team = next((t for t in teams_data if not t["player_ids"]), None)
+    if error_team:
+        flash(f"L'équipe « {error_team['name']} » doit avoir au moins un joueur.", "danger")
+        # Reconstruct teams in template shape so the form is preserved
+        all_players = db.get_all_players()
+        player_map = {p["id"]: p for p in all_players}
+        fake_teams = []
+        for idx, t in enumerate(teams_data):
+            fake_teams.append({
+                "id": None,
+                "name": t["name"],
+                "placement": None,
+                "points_override": None,
+                "did_not_participate": 0,
+                "players": [player_map[pid] for pid in t["player_ids"] if pid in player_map],
+            })
+        score_cfg = db.get_score_config(game["type"])
+        free_players = [p for p in all_players
+                        if p["id"] not in {pid for t in teams_data for pid in t["player_ids"]}]
+        return render_template("admin/jeu_detail.html",
+                               game=game, teams=[],
+                               form_teams=fake_teams,
+                               players=all_players, free_players=free_players,
+                               score_cfg=score_cfg)
+
     db.save_teams(game_id, teams_data)
     # Move status to en_cours if still en_attente
     if game["status"] == "en_attente":
@@ -301,6 +326,7 @@ def admin_jeu_resultats(game_id):
     placements = {}
     overrides = {}
     dnp_team_ids = set()
+    error = None
     for team in teams:
         dnp = request.form.get(f"dnp_{team['id']}") == "1"
         if dnp:
@@ -308,11 +334,26 @@ def admin_jeu_resultats(game_id):
             continue
         val = request.form.get(f"placement_{team['id']}", "").strip()
         if not val.isdigit() or int(val) < 1:
-            flash("Tous les placements doivent être des nombres entiers ≥ 1 (ou cochez N'a pas participé).", "danger")
-            return redirect(url_for("admin_jeu_detail", game_id=game_id))
+            error = f"Le placement de « {team['name']} » est invalide (doit être ≥ 1, ou cochez N'a pas participé)."
+            break
         placements[team["id"]] = int(val)
         ov = request.form.get(f"points_override_{team['id']}", "").strip()
         overrides[team["id"]] = int(ov) if ov.lstrip("-").isdigit() else None
+
+    if error:
+        # Re-inject submitted values into teams so the form keeps what was typed
+        for team in teams:
+            team["placement"] = placements.get(team["id"], team.get("placement"))
+            team["points_override"] = overrides.get(team["id"], team.get("points_override"))
+            team["did_not_participate"] = 1 if team["id"] in dnp_team_ids else 0
+        flash(error, "danger")
+        score_cfg = db.get_score_config(game["type"])
+        players = db.get_all_players()
+        free_players = db.get_players_not_in_game(game_id)
+        return render_template("admin/jeu_detail.html",
+                               game=game, teams=teams,
+                               players=players, free_players=free_players,
+                               score_cfg=score_cfg)
 
     db.save_results(game_id, placements, overrides, dnp_team_ids)
     flash("Résultats enregistrés. Le leaderboard a été mis à jour.", "success")
