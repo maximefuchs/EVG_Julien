@@ -8,3 +8,7 @@ UX
 - team game: when selecting a player for one team, the player should be removed from the other lists
 - when click on save results, if there is an issue that is raised, show the issue, but dont delete everything that has been written
 - when putting place for each player or team, dont show the values that have already been assigned
+
+FEATURES
+- show results per game in dashboard
+- remove saturday and sunday filter, just put everything
