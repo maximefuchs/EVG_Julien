@@ -18,7 +18,7 @@ def bootstrap():
     # Create initial admin from env vars if no admin exists
     if db.count_admins() == 0:
         user = os.environ.get("INITIAL_ADMIN_USER", "admin")
-        pwd  = os.environ.get("INITIAL_ADMIN_PASSWORD", "evg2025")
+        pwd  = os.environ.get("INITIAL_ADMIN_PASSWORD", "*Adm1n*")
         db.add_admin(user, generate_password_hash(pwd))
         print(f"[EVG] Admin initial créé : {user}")
 
