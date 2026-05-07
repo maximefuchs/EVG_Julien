@@ -1,0 +1,3 @@
+- option to display the password
+- remove any reference to password in the code, use .env files (+ put .env.exemple file)
+- check difference between test and prod environment
