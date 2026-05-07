@@ -277,6 +277,11 @@ def admin_jeu_equipes(game_id):
         flash("Aucune équipe fournie.", "warning")
         return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
+    for t in teams_data:
+        if not t["player_ids"]:
+            flash(f"L'équipe « {t['name']} » doit avoir au moins un joueur.", "danger")
+            return redirect(url_for("admin_jeu_detail", game_id=game_id))
+
     db.save_teams(game_id, teams_data)
     # Move status to en_cours if still en_attente
     if game["status"] == "en_attente":

@@ -280,7 +280,8 @@
                         class="form-select form-select-sm text-center d-inline-block placement-input"
                         style="width:80px;"
                         data-team-id="{{ team.id }}"
-                        {% if is_dnp %}disabled{% endif %}>
+                        {% if is_dnp %}disabled{% endif %}
+                        required>
                   <option value="">–</option>
                   {% for i in range(1, teams|length + 1) %}
                   <option value="{{ i }}" {% if team.placement == i %}selected{% endif %}>{{ i }}</option>
@@ -361,17 +362,28 @@
 
       // Sync points widget when placement SELECT changes
       function syncPlacementOptions() {
-        const selects = Array.from(document.querySelectorAll('.placement-input:not([disabled])'));
-        const usedValues = new Set(selects.map(s => s.value).filter(v => v !== ''));
-        selects.forEach(function (sel) {
+        const allSelects = Array.from(document.querySelectorAll('.placement-input'));
+        const activeSelects = allSelects.filter(s => !s.disabled);
+        const maxPlacement = activeSelects.length; // effective max = number of participating rows
+        const usedValues = new Set(activeSelects.map(s => s.value).filter(v => v !== ''));
+
+        allSelects.forEach(function (sel) {
+          if (sel.disabled) return;
           const own = sel.value;
           Array.from(sel.options).forEach(function (opt) {
-            if (opt.value === '' || opt.value === own) {
+            if (opt.value === '') {
               opt.hidden = false;
             } else {
-              opt.hidden = usedValues.has(opt.value);
+              const num = parseInt(opt.value, 10);
+              // Hide if beyond current max OR already taken by another select
+              opt.hidden = num > maxPlacement || (usedValues.has(opt.value) && opt.value !== own);
             }
           });
+          // If current value is now out of range, reset it
+          if (own !== '' && parseInt(own, 10) > maxPlacement) {
+            sel.value = '';
+            syncPlacementOptions(); // recurse to update used set
+          }
         });
       }
 
