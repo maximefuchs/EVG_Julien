@@ -17,8 +17,8 @@
         <form method="POST">
           <input type="hidden" name="action" value="ajouter">
           <div class="mb-3">
-            <input type="text" name="name" class="form-control"
-                   placeholder="Prénom ou pseudo" required>
+            <input type="text" name="name" id="input-add-player" class="form-control"
+                   placeholder="Prénom ou pseudo" required autofocus>
           </div>
           <button type="submit" class="btn btn-gold w-100">Ajouter</button>
         </form>
@@ -91,4 +91,8 @@
   </div>
 
 </div>
+<script>
+  // Keep focus on the add-player input after every page load/reload
+  document.getElementById('input-add-player').focus();
+</script>
 {% endblock %}

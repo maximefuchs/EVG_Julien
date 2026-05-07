@@ -29,17 +29,19 @@ def init_db():
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 name       TEXT NOT NULL,
                 day        TEXT NOT NULL CHECK(day IN ('samedi','dimanche')),
-                type       TEXT NOT NULL CHECK(type IN ('mini_jeu','karting')),
+                type       TEXT NOT NULL CHECK(type IN ('mini_jeu','karting','mini_jeu_ind')),
                 status     TEXT NOT NULL DEFAULT 'en_attente'
                                CHECK(status IN ('en_attente','en_cours','termine')),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS game_teams (
-                id        INTEGER PRIMARY KEY AUTOINCREMENT,
-                game_id   INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-                name      TEXT NOT NULL,
-                placement INTEGER
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id             INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+                name                TEXT NOT NULL,
+                placement           INTEGER,
+                points_override     INTEGER,
+                did_not_participate INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS team_players (
@@ -50,26 +52,49 @@ def init_db():
 
             CREATE TABLE IF NOT EXISTS score_config (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                game_type  TEXT NOT NULL CHECK(game_type IN ('mini_jeu','karting')),
+                game_type  TEXT NOT NULL CHECK(game_type IN ('mini_jeu','karting','mini_jeu_ind')),
                 placement  INTEGER NOT NULL,
                 points     INTEGER NOT NULL DEFAULT 0,
                 UNIQUE(game_type, placement)
             );
         """)
 
+        # Migrations: add columns if they don't exist yet
+        cols = [r[1] for r in db.execute("PRAGMA table_info(game_teams)").fetchall()]
+        if "points_override" not in cols:
+            db.execute("ALTER TABLE game_teams ADD COLUMN points_override INTEGER")
+        if "did_not_participate" not in cols:
+            db.execute("ALTER TABLE game_teams ADD COLUMN did_not_participate INTEGER NOT NULL DEFAULT 0")
+
         # Default score config (only inserted if table is empty)
         existing = db.execute("SELECT COUNT(*) FROM score_config").fetchone()[0]
         if existing == 0:
             defaults = [
-                ("mini_jeu", 1, 5), ("mini_jeu", 2, 4), ("mini_jeu", 3, 3),
-                ("mini_jeu", 4, 2), ("mini_jeu", 5, 1), ("mini_jeu", 6, 0),
-                ("karting",  1, 10), ("karting",  2, 8), ("karting",  3, 6),
-                ("karting",  4, 4), ("karting",  5, 2), ("karting",  6, 1),
+                ("mini_jeu",     1, 5), ("mini_jeu",     2, 4), ("mini_jeu",     3, 3),
+                ("mini_jeu",     4, 2), ("mini_jeu",     5, 1), ("mini_jeu",     6, 0),
+                ("karting",      1, 10), ("karting",     2, 8), ("karting",      3, 6),
+                ("karting",      4, 4), ("karting",      5, 2), ("karting",      6, 1),
+                ("mini_jeu_ind", 1, 5), ("mini_jeu_ind", 2, 4), ("mini_jeu_ind", 3, 3),
+                ("mini_jeu_ind", 4, 2), ("mini_jeu_ind", 5, 1), ("mini_jeu_ind", 6, 0),
             ]
             db.executemany(
                 "INSERT INTO score_config (game_type, placement, points) VALUES (?,?,?)",
                 defaults
             )
+        else:
+            # Ensure mini_jeu_ind defaults exist for existing databases
+            ind_existing = db.execute(
+                "SELECT COUNT(*) FROM score_config WHERE game_type='mini_jeu_ind'"
+            ).fetchone()[0]
+            if ind_existing == 0:
+                ind_defaults = [
+                    ("mini_jeu_ind", 1, 5), ("mini_jeu_ind", 2, 4), ("mini_jeu_ind", 3, 3),
+                    ("mini_jeu_ind", 4, 2), ("mini_jeu_ind", 5, 1), ("mini_jeu_ind", 6, 0),
+                ]
+                db.executemany(
+                    "INSERT INTO score_config (game_type, placement, points) VALUES (?,?,?)",
+                    ind_defaults
+                )
 
         db.commit()
 
@@ -88,7 +113,9 @@ def get_leaderboard(day=None):
             SELECT
                 p.id,
                 p.name,
-                COALESCE(SUM(COALESCE(sc.points, 0)), 0) AS total_points,
+                COALESCE(SUM(CASE WHEN gt.did_not_participate = 0
+                                  THEN COALESCE(gt.points_override, sc.points, 0)
+                                  ELSE 0 END), 0) AS total_points,
                 COUNT(DISTINCT CASE WHEN g.status = 'termine' THEN g.id END) AS games_played
             FROM players p
             LEFT JOIN team_players tp ON tp.player_id = p.id
@@ -115,7 +142,7 @@ def get_player_game_breakdown(player_id):
                 g.type,
                 gt.name AS team_name,
                 gt.placement,
-                COALESCE(sc.points, 0) AS points
+                COALESCE(gt.points_override, COALESCE(sc.points, 0)) AS points
             FROM team_players tp
             JOIN game_teams gt   ON gt.id = tp.team_id AND gt.placement IS NOT NULL
             JOIN games g         ON g.id = gt.game_id  AND g.status = 'termine'
@@ -280,22 +307,87 @@ def save_teams(game_id, teams_data):
         db.commit()
 
 
-def save_results(game_id, placements):
+def save_results(game_id, placements, overrides=None, dnp_team_ids=None):
     """
-    placements: dict {team_id: placement_int}
+    placements:    dict {team_id: placement_int}  — only participating teams
+    overrides:     dict {team_id: points_int or None}
+    dnp_team_ids:  set/list of team_ids that did not participate
     """
+    if overrides is None:
+        overrides = {}
+    if dnp_team_ids is None:
+        dnp_team_ids = set()
     with get_db() as db:
+        # Reset all teams for this game first
+        db.execute(
+            "UPDATE game_teams SET placement=NULL, points_override=NULL, did_not_participate=0 WHERE game_id=?",
+            [game_id])
+        # Save participating teams
         for team_id, placement in placements.items():
+            override = overrides.get(team_id)
             db.execute(
-                "UPDATE game_teams SET placement=? WHERE id=? AND game_id=?",
-                [placement, team_id, game_id])
+                "UPDATE game_teams SET placement=?, points_override=?, did_not_participate=0 WHERE id=? AND game_id=?",
+                [placement, override, team_id, game_id])
+        # Mark non-participating teams
+        for team_id in dnp_team_ids:
+            db.execute(
+                "UPDATE game_teams SET placement=NULL, points_override=NULL, did_not_participate=1 WHERE id=? AND game_id=?",
+                [team_id, game_id])
         db.execute("UPDATE games SET status='termine' WHERE id=?", [game_id])
         db.commit()
 
 
-# ---------------------------------------------------------------------------
-# Score config
-# ---------------------------------------------------------------------------
+def setup_individual_game(game_id):
+    """
+    For mini_jeu_ind / karting: create one game_team per player (if not already set up).
+    Called when the game transitions to en_cours.
+    """
+    with get_db() as db:
+        players = db.execute("SELECT * FROM players ORDER BY name").fetchall()
+        existing = db.execute(
+            "SELECT tp.player_id FROM team_players tp "
+            "JOIN game_teams gt ON gt.id = tp.team_id WHERE gt.game_id=?",
+            [game_id]).fetchall()
+        existing_ids = {r[0] for r in existing}
+        for p in players:
+            if p["id"] not in existing_ids:
+                cur = db.execute(
+                    "INSERT INTO game_teams (game_id, name) VALUES (?,?)",
+                    [game_id, p["name"]])
+                db.execute(
+                    "INSERT INTO team_players (team_id, player_id) VALUES (?,?)",
+                    [cur.lastrowid, p["id"]])
+        db.commit()
+
+
+def mark_new_player_dnp_in_finished_games(player_id):
+    """
+    When a new player is added, insert a did_not_participate=1 team entry
+    for every already-finished game so the leaderboard stays consistent.
+    """
+    with get_db() as db:
+        player = db.execute("SELECT * FROM players WHERE id=?", [player_id]).fetchone()
+        if not player:
+            return
+        finished_games = db.execute(
+            "SELECT * FROM games WHERE status='termine'").fetchall()
+        for game in finished_games:
+            # Check if player already has an entry for this game
+            already = db.execute("""
+                SELECT 1 FROM team_players tp
+                JOIN game_teams gt ON gt.id = tp.team_id
+                WHERE gt.game_id=? AND tp.player_id=?
+            """, [game["id"], player_id]).fetchone()
+            if not already:
+                cur = db.execute(
+                    "INSERT INTO game_teams (game_id, name, did_not_participate) VALUES (?,?,1)",
+                    [game["id"], player["name"]])
+                db.execute(
+                    "INSERT INTO team_players (team_id, player_id) VALUES (?,?)",
+                    [cur.lastrowid, player_id])
+        db.commit()
+
+
 
 def get_score_config(game_type):
     with get_db() as db:

@@ -141,6 +141,11 @@ def admin_joueurs():
             if name:
                 try:
                     db.add_player(name)
+                    # Get the newly created player and mark them as dnp in all finished games
+                    all_players = db.get_all_players()
+                    new_player = next((p for p in all_players if p["name"] == name), None)
+                    if new_player:
+                        db.mark_new_player_dnp_in_finished_games(new_player["id"])
                     flash(f"Joueur « {name} » ajouté.", "success")
                 except Exception:
                     flash("Ce nom existe déjà.", "danger")
@@ -216,7 +221,7 @@ def admin_jeux_nouveau():
     name      = request.form.get("name", "").strip()
     day       = request.form.get("day")
     game_type = request.form.get("type")
-    if not name or day not in ("samedi", "dimanche") or game_type not in ("mini_jeu", "karting"):
+    if not name or day not in ("samedi", "dimanche") or game_type not in ("mini_jeu", "karting", "mini_jeu_ind"):
         flash("Données invalides.", "danger")
         return redirect(url_for("admin_jeux"))
     game_id = db.create_game(name, day, game_type)
@@ -294,14 +299,22 @@ def admin_jeu_resultats(game_id):
         return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
     placements = {}
+    overrides = {}
+    dnp_team_ids = set()
     for team in teams:
+        dnp = request.form.get(f"dnp_{team['id']}") == "1"
+        if dnp:
+            dnp_team_ids.add(team["id"])
+            continue
         val = request.form.get(f"placement_{team['id']}", "").strip()
         if not val.isdigit() or int(val) < 1:
-            flash("Tous les placements doivent être des nombres entiers ≥ 1.", "danger")
+            flash("Tous les placements doivent être des nombres entiers ≥ 1 (ou cochez N'a pas participé).", "danger")
             return redirect(url_for("admin_jeu_detail", game_id=game_id))
         placements[team["id"]] = int(val)
+        ov = request.form.get(f"points_override_{team['id']}", "").strip()
+        overrides[team["id"]] = int(ov) if ov.lstrip("-").isdigit() else None
 
-    db.save_results(game_id, placements)
+    db.save_results(game_id, placements, overrides, dnp_team_ids)
     flash("Résultats enregistrés. Le leaderboard a été mis à jour.", "success")
     return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
@@ -313,7 +326,11 @@ def admin_jeu_statut(game_id):
     if status not in ("en_attente", "en_cours", "termine"):
         flash("Statut invalide.", "danger")
     else:
+        game = db.get_game(game_id)
         db.update_game_status(game_id, status)
+        # For individual games, auto-create one entry per player when starting
+        if status == "en_cours" and game and game["type"] in ("mini_jeu_ind", "karting"):
+            db.setup_individual_game(game_id)
         flash("Statut mis à jour.", "success")
     return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
@@ -342,7 +359,7 @@ def admin_configuration():
 
         if action == "sauvegarder":
             game_type = request.form.get("game_type")
-            if game_type not in ("mini_jeu", "karting"):
+            if game_type not in ("mini_jeu", "karting", "mini_jeu_ind"):
                 flash("Type de jeu invalide.", "danger")
                 return redirect(url_for("admin_configuration"))
             placements = request.form.getlist("placement[]")
@@ -355,7 +372,7 @@ def admin_configuration():
         elif action == "supprimer_ligne":
             game_type = request.form.get("game_type")
             placement = request.form.get("placement")
-            if game_type in ("mini_jeu", "karting") and str(placement).isdigit():
+            if game_type in ("mini_jeu", "karting", "mini_jeu_ind") and str(placement).isdigit():
                 db.delete_score_config_row(game_type, int(placement))
                 flash("Ligne supprimée.", "success")
 
@@ -363,8 +380,9 @@ def admin_configuration():
 
     mini_cfg    = db.get_score_config("mini_jeu")
     karting_cfg = db.get_score_config("karting")
+    ind_cfg     = db.get_score_config("mini_jeu_ind")
     return render_template("admin/configuration.html",
-                           mini_cfg=mini_cfg, karting_cfg=karting_cfg)
+                           mini_cfg=mini_cfg, karting_cfg=karting_cfg, ind_cfg=ind_cfg)
 
 
 # ---------------------------------------------------------------------------
