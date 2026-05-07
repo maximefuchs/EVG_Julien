@@ -277,10 +277,30 @@ def admin_jeu_equipes(game_id):
         flash("Aucune équipe fournie.", "warning")
         return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
-    for t in teams_data:
-        if not t["player_ids"]:
-            flash(f"L'équipe « {t['name']} » doit avoir au moins un joueur.", "danger")
-            return redirect(url_for("admin_jeu_detail", game_id=game_id))
+    error_team = next((t for t in teams_data if not t["player_ids"]), None)
+    if error_team:
+        flash(f"L'équipe « {error_team['name']} » doit avoir au moins un joueur.", "danger")
+        # Reconstruct teams in template shape so the form is preserved
+        all_players = db.get_all_players()
+        player_map = {p["id"]: p for p in all_players}
+        fake_teams = []
+        for idx, t in enumerate(teams_data):
+            fake_teams.append({
+                "id": None,
+                "name": t["name"],
+                "placement": None,
+                "points_override": None,
+                "did_not_participate": 0,
+                "players": [player_map[pid] for pid in t["player_ids"] if pid in player_map],
+            })
+        score_cfg = db.get_score_config(game["type"])
+        free_players = [p for p in all_players
+                        if p["id"] not in {pid for t in teams_data for pid in t["player_ids"]}]
+        return render_template("admin/jeu_detail.html",
+                               game=game, teams=[],
+                               form_teams=fake_teams,
+                               players=all_players, free_players=free_players,
+                               score_cfg=score_cfg)
 
     db.save_teams(game_id, teams_data)
     # Move status to en_cours if still en_attente

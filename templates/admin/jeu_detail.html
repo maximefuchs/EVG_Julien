@@ -59,8 +59,9 @@
           id="teams-form">
 
       <div id="teams-container">
-        {% if teams %}
-          {% for team in teams %}
+        {% set display_teams = form_teams if form_teams is defined else teams %}
+        {% if display_teams %}
+          {% for team in display_teams %}
           {% set tidx = loop.index %}
           <div class="team-block">
             <div class="team-title">
@@ -266,7 +267,7 @@
             </tr>
           </thead>
           <tbody>
-            {% for team in teams %}
+          {% for team in display_teams %}
             {% set is_dnp = team.did_not_participate %}
             <tr style="border-color:#2a2a4a;" class="result-row" data-team-id="{{ team.id }}">
               <td><strong>{{ team.name }}</strong></td>
