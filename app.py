@@ -141,6 +141,11 @@ def admin_joueurs():
             if name:
                 try:
                     db.add_player(name)
+                    # Get the newly created player and mark them as dnp in all finished games
+                    all_players = db.get_all_players()
+                    new_player = next((p for p in all_players if p["name"] == name), None)
+                    if new_player:
+                        db.mark_new_player_dnp_in_finished_games(new_player["id"])
                     flash(f"Joueur « {name} » ajouté.", "success")
                 except Exception:
                     flash("Ce nom existe déjà.", "danger")
@@ -295,16 +300,21 @@ def admin_jeu_resultats(game_id):
 
     placements = {}
     overrides = {}
+    dnp_team_ids = set()
     for team in teams:
+        dnp = request.form.get(f"dnp_{team['id']}") == "1"
+        if dnp:
+            dnp_team_ids.add(team["id"])
+            continue
         val = request.form.get(f"placement_{team['id']}", "").strip()
         if not val.isdigit() or int(val) < 1:
-            flash("Tous les placements doivent être des nombres entiers ≥ 1.", "danger")
+            flash("Tous les placements doivent être des nombres entiers ≥ 1 (ou cochez N'a pas participé).", "danger")
             return redirect(url_for("admin_jeu_detail", game_id=game_id))
         placements[team["id"]] = int(val)
         ov = request.form.get(f"points_override_{team['id']}", "").strip()
         overrides[team["id"]] = int(ov) if ov.lstrip("-").isdigit() else None
 
-    db.save_results(game_id, placements, overrides)
+    db.save_results(game_id, placements, overrides, dnp_team_ids)
     flash("Résultats enregistrés. Le leaderboard a été mis à jour.", "success")
     return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
@@ -316,7 +326,11 @@ def admin_jeu_statut(game_id):
     if status not in ("en_attente", "en_cours", "termine"):
         flash("Statut invalide.", "danger")
     else:
+        game = db.get_game(game_id)
         db.update_game_status(game_id, status)
+        # For individual games, auto-create one entry per player when starting
+        if status == "en_cours" and game and game["type"] in ("mini_jeu_ind", "karting"):
+            db.setup_individual_game(game_id)
         flash("Statut mis à jour.", "success")
     return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
