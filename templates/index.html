@@ -11,20 +11,6 @@
   </div>
 
   <!-- Day filter tabs -->
-  <ul class="nav filter-tabs justify-content-center mb-4">
-    <li class="nav-item">
-      <a class="nav-link {% if jour == 'tous' %}active{% endif %}"
-         href="{{ url_for('index') }}">Tout le week-end</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link {% if jour == 'samedi' %}active{% endif %}"
-         href="{{ url_for('index', jour='samedi') }}">Samedi</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link {% if jour == 'dimanche' %}active{% endif %}"
-         href="{{ url_for('index', jour='dimanche') }}">Dimanche</a>
-    </li>
-  </ul>
 
   <!-- Leaderboard table -->
   <div class="card mx-auto" style="max-width:700px;">

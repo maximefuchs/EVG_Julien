@@ -45,8 +45,7 @@
   }
 
   function refresh() {
-    const jour = new URLSearchParams(window.location.search).get("jour") || "";
-    const url  = "/api/leaderboard" + (jour ? `?jour=${jour}` : "");
+    const url = "/api/leaderboard";
 
     if (indicator) { indicator.textContent = "Actualisation…"; indicator.classList.add("refreshing"); }
 

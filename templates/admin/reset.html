@@ -1,0 +1,27 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Réinitialiser la base – Admin{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Réinitialiser la base de données</h2>
+
+<div class="card border-danger" style="max-width:520px;">
+  <div class="card-header bg-danger text-white fw-bold">
+    Zone dangereuse
+  </div>
+  <div class="card-body">
+    <p>Cette action supprime <strong>tous les joueurs, jeux et scores</strong>.</p>
+    <p>Les comptes administrateurs et la configuration des points sont conservés.</p>
+    <p class="mb-1">Pour confirmer, tapez <code>RESET</code> dans le champ ci-dessous :</p>
+
+    <form method="POST" action="{{ url_for('admin_reset') }}">
+      <div class="mb-3">
+        <input type="text" name="confirmation" class="form-control"
+               placeholder="RESET" autocomplete="off" required>
+      </div>
+      <button type="submit" class="btn btn-danger w-100">
+        Réinitialiser
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

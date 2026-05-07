@@ -1,8 +1,10 @@
 import os
 import json
+import shutil
+import tempfile
 from functools import wraps
 from flask import (Flask, render_template, request, redirect, url_for,
-                   session, flash, jsonify)
+                   session, flash, jsonify, send_file)
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
@@ -61,17 +63,13 @@ def login_required(f):
 
 @app.route("/")
 def index():
-    day = request.args.get("jour")  # samedi / dimanche / None
-    leaderboard = db.get_leaderboard(day if day in ("samedi", "dimanche") else None)
-    # Add rank considering ties
-    leaderboard = _add_ranks(leaderboard)
-    return render_template("index.html", leaderboard=leaderboard, jour=day or "tous")
+    leaderboard = _add_ranks(db.get_leaderboard())
+    return render_template("index.html", leaderboard=leaderboard)
 
 
 @app.route("/api/leaderboard")
 def api_leaderboard():
-    day = request.args.get("jour")
-    leaderboard = db.get_leaderboard(day if day in ("samedi", "dimanche") else None)
+    leaderboard = _add_ranks(db.get_leaderboard())
     leaderboard = _add_ranks(leaderboard)
     return jsonify(leaderboard)
 
@@ -140,9 +138,11 @@ def admin_dashboard():
     games = db.get_all_games()
     en_cours = [g for g in games if g["status"] == "en_cours"]
     total_players = len(db.get_all_players())
+    finished_games = db.get_finished_games_with_results()
     return render_template("admin/dashboard.html",
                            top5=top5, games=games, en_cours=en_cours,
-                           total_players=total_players)
+                           total_players=total_players,
+                           finished_games=finished_games)
 
 
 # ---------------------------------------------------------------------------
@@ -449,6 +449,57 @@ def admin_configuration():
     ind_cfg     = db.get_score_config("mini_jeu_ind")
     return render_template("admin/configuration.html",
                            mini_cfg=mini_cfg, karting_cfg=karting_cfg, ind_cfg=ind_cfg)
+
+
+# ---------------------------------------------------------------------------
+# Admin – Reset database
+# ---------------------------------------------------------------------------
+
+@app.route("/admin/reset", methods=["GET", "POST"])
+@login_required
+def admin_reset():
+    if request.method == "POST":
+        confirmation = request.form.get("confirmation", "").strip()
+        if confirmation != "RESET":
+            flash("Confirmation incorrecte. Tapez exactement RESET.", "danger")
+            return redirect(url_for("admin_reset"))
+        db.reset_db()
+        flash("Base de données réinitialisée. Tous les joueurs, jeux et scores ont été supprimés.", "success")
+        return redirect(url_for("admin_dashboard"))
+    return render_template("admin/reset.html")
+
+
+# ---------------------------------------------------------------------------
+# Admin – Export / Import database
+# ---------------------------------------------------------------------------
+
+@app.route("/admin/db/export")
+@login_required
+def admin_db_export():
+    db_path = db.DATABASE
+    # Copy to a temp file so the download name is always "evg_backup.db"
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp.close()
+    shutil.copy2(db_path, tmp.name)
+    return send_file(tmp.name, as_attachment=True, download_name="evg_backup.db",
+                     mimetype="application/octet-stream")
+
+
+@app.route("/admin/db/import", methods=["GET", "POST"])
+@login_required
+def admin_db_import():
+    if request.method == "POST":
+        f = request.files.get("db_file")
+        if not f or not f.filename.endswith(".db"):
+            flash("Fichier invalide. Choisissez un fichier .db.", "danger")
+            return redirect(url_for("admin_db_import"))
+        # Write directly over the live database file
+        f.save(db.DATABASE)
+        # Re-run migrations in case the backup is from an older schema
+        db.init_db()
+        flash("Base de données restaurée avec succès.", "success")
+        return redirect(url_for("admin_dashboard"))
+    return render_template("admin/db_import.html")
 
 
 # ---------------------------------------------------------------------------

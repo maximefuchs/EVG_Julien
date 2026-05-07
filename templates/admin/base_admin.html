@@ -50,6 +50,15 @@
            href="{{ url_for('admin_configuration') }}">
           <i>⚙️</i> Configuration
         </a>
+        <hr class="my-2">
+        <a class="nav-link {% if request.endpoint == 'admin_db_import' %}active{% endif %}"
+           href="{{ url_for('admin_db_import') }}">
+          <i>💾</i> Sauvegarde
+        </a>
+        <a class="nav-link text-danger {% if request.endpoint == 'admin_reset' %}active{% endif %}"
+           href="{{ url_for('admin_reset') }}">
+          <i>🗑️</i> Réinitialiser
+        </a>
       </nav>
     </div>
 
