@@ -105,30 +105,48 @@ def init_db():
 
 def get_leaderboard(day=None):
     """Return individual rankings, optionally filtered by day."""
-    day_filter = "AND g.day = ?" if day else ""
-    params = [day] if day else []
-
     with get_db() as db:
-        rows = db.execute(f"""
-            SELECT
-                p.id,
-                p.name,
-                COALESCE(SUM(CASE WHEN gt.did_not_participate = 0
-                                  THEN COALESCE(gt.points_override, sc.points, 0)
-                                  ELSE 0 END), 0) AS total_points,
-                COUNT(DISTINCT CASE WHEN g.status = 'termine' THEN g.id END) AS games_played
-            FROM players p
-            LEFT JOIN team_players tp ON tp.player_id = p.id
-            LEFT JOIN game_teams gt   ON gt.id = tp.team_id
-                                     AND gt.placement IS NOT NULL
-            LEFT JOIN games g         ON g.id = gt.game_id
-                                     AND g.status = 'termine'
-                                     {day_filter}
-            LEFT JOIN score_config sc ON sc.game_type = g.type
-                                     AND sc.placement = gt.placement
-            GROUP BY p.id, p.name
-            ORDER BY total_points DESC, p.name ASC
-        """, params).fetchall()
+        if day:
+            rows = db.execute("""
+                SELECT
+                    p.id,
+                    p.name,
+                    COALESCE(SUM(CASE WHEN gt.did_not_participate = 0
+                                      THEN COALESCE(gt.points_override, sc.points, 0)
+                                      ELSE 0 END), 0) AS total_points,
+                    COUNT(DISTINCT CASE WHEN g.status = 'termine' THEN g.id END) AS games_played
+                FROM players p
+                LEFT JOIN team_players tp ON tp.player_id = p.id
+                LEFT JOIN game_teams gt   ON gt.id = tp.team_id
+                                         AND gt.placement IS NOT NULL
+                LEFT JOIN games g         ON g.id = gt.game_id
+                                         AND g.status = 'termine'
+                                         AND g.day = ?
+                LEFT JOIN score_config sc ON sc.game_type = g.type
+                                         AND sc.placement = gt.placement
+                GROUP BY p.id, p.name
+                ORDER BY total_points DESC, p.name ASC
+            """, [day]).fetchall()
+        else:
+            rows = db.execute("""
+                SELECT
+                    p.id,
+                    p.name,
+                    COALESCE(SUM(CASE WHEN gt.did_not_participate = 0
+                                      THEN COALESCE(gt.points_override, sc.points, 0)
+                                      ELSE 0 END), 0) AS total_points,
+                    COUNT(DISTINCT CASE WHEN g.status = 'termine' THEN g.id END) AS games_played
+                FROM players p
+                LEFT JOIN team_players tp ON tp.player_id = p.id
+                LEFT JOIN game_teams gt   ON gt.id = tp.team_id
+                                         AND gt.placement IS NOT NULL
+                LEFT JOIN games g         ON g.id = gt.game_id
+                                         AND g.status = 'termine'
+                LEFT JOIN score_config sc ON sc.game_type = g.type
+                                         AND sc.placement = gt.placement
+                GROUP BY p.id, p.name
+                ORDER BY total_points DESC, p.name ASC
+            """).fetchall()
     return [dict(r) for r in rows]
 
 
