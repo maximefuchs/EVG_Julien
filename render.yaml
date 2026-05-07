@@ -8,6 +8,6 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: INITIAL_ADMIN_USER
-        value: admin
+        sync: false   # set manually in Render dashboard
       - key: INITIAL_ADMIN_PASSWORD
         sync: false   # set manually in Render dashboard

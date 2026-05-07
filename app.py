@@ -3,11 +3,24 @@ import json
 from functools import wraps
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, flash, jsonify)
+from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
+from dotenv import load_dotenv
 import database as db
 
+load_dotenv()  # Load .env in development (no-op in production if vars already set)
+
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me-in-prod")
+
+_secret = os.environ.get("SECRET_KEY")
+if not _secret:
+    raise RuntimeError(
+        "SECRET_KEY environment variable is not set. "
+        "Copy .env.example to .env and fill in the values."
+    )
+app.secret_key = _secret
+
+csrf = CSRFProtect(app)
 
 # ---------------------------------------------------------------------------
 # Bootstrap DB + initial admin
@@ -18,7 +31,12 @@ def bootstrap():
     # Create initial admin from env vars if no admin exists
     if db.count_admins() == 0:
         user = os.environ.get("INITIAL_ADMIN_USER", "admin")
-        pwd  = os.environ.get("INITIAL_ADMIN_PASSWORD", "*Adm1n*")
+        pwd  = os.environ.get("INITIAL_ADMIN_PASSWORD")
+        if not pwd:
+            raise RuntimeError(
+                "INITIAL_ADMIN_PASSWORD environment variable is not set. "
+                "Set it in .env before the first run."
+            )
         db.add_admin(user, generate_password_hash(pwd))
         print(f"[EVG] Admin initial créé : {user}")
 
@@ -104,7 +122,7 @@ def admin_connexion():
     return render_template("admin/connexion.html", error=error)
 
 
-@app.route("/admin/deconnexion")
+@app.route("/admin/deconnexion", methods=["POST"])
 def admin_deconnexion():
     session.clear()
     return redirect(url_for("index"))
@@ -182,13 +200,20 @@ def admin_comptes():
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
             if username and password:
+                if len(password) < 8:
+                    flash("Le mot de passe doit faire au moins 8 caractères.", "danger")
+                    return redirect(url_for("admin_comptes"))
                 try:
                     db.add_admin(username, generate_password_hash(password))
                     flash(f"Compte « {username} » créé.", "success")
                 except Exception:
                     flash("Ce nom d'utilisateur existe déjà.", "danger")
         elif action == "supprimer":
-            aid = int(request.form.get("admin_id"))
+            try:
+                aid = int(request.form.get("admin_id", ""))
+            except (ValueError, TypeError):
+                flash("Identifiant invalide.", "danger")
+                return redirect(url_for("admin_comptes"))
             if aid == session["admin_id"]:
                 flash("Vous ne pouvez pas supprimer votre propre compte.", "danger")
             elif db.count_admins() <= 1:
