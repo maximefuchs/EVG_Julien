@@ -3,5 +3,4 @@ SECURITY
 UX
 
 FEATURES
-- show results per game in dashboard
-- remove saturday and sunday filter, just put everything
+- add bonus game type (indiv + sum of points should be 0)
