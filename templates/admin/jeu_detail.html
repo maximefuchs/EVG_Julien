@@ -2,6 +2,9 @@
 {% block title %}{{ game.name }} – Admin EVG{% endblock %}
 
 {% block content %}
+{# Variables used in both sections — set once here so they're always defined #}
+{% set is_individual  = game.type in ('karting', 'mini_jeu_ind') %}
+{% set display_teams  = form_teams if form_teams is defined else teams %}
 
 <!-- Header -->
 <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
@@ -59,7 +62,6 @@
           id="teams-form">
 
       <div id="teams-container">
-        {% set display_teams = form_teams if form_teams is defined else teams %}
         {% if display_teams %}
           {% for team in display_teams %}
           {% set tidx = loop.index %}
@@ -156,7 +158,6 @@
 {% endif %}
 
 <!-- ===== SECTION 2 : Résultats ===== -->
-{% set is_individual = game.type in ('karting', 'mini_jeu_ind') %}
 
 {% if is_individual and game.status == 'en_attente' %}
 {# Individual game not started yet — nothing to show beyond the Start button #}

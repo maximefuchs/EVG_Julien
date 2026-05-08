@@ -61,6 +61,7 @@ a:hover { color: #ffd966; text-decoration: none; }
   font-size: 0.8rem;
   letter-spacing: 1px;
   border-color: #2a2a4a;
+  vertical-align: bottom;
 }
 .leaderboard-table td {
   vertical-align: middle;
@@ -70,6 +71,38 @@ a:hover { color: #ffd966; text-decoration: none; }
 }
 .leaderboard-table tbody tr:hover td {
   background-color: #1e1e3a;
+}
+
+/* Game columns in leaderboard */
+.lb-game-col {
+  min-width: 80px;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 600;
+  color: #e0e0e0 !important;
+  border-left: 1px solid #2a2a4a;
+}
+.lb-day-label {
+  font-size: 0.65rem;
+  color: var(--gold);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+.lb-game-cell {
+  border-left: 1px solid #2a2a4a;
+  font-size: 0.9rem;
+}
+.lb-pts {
+  font-weight: 700;
+  color: #e0e0e0;
+}
+.lb-dnp {
+  color: #555;
+  font-weight: 400;
 }
 
 /* Rank medals */

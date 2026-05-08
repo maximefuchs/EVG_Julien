@@ -128,6 +128,44 @@ def get_leaderboard():
     return [dict(r) for r in rows]
 
 
+def get_finished_games():
+    """Return all finished games ordered by day then creation date."""
+    with get_db() as db:
+        return [dict(r) for r in db.execute(
+            "SELECT id, name, day, type FROM games "
+            "WHERE status = 'termine' ORDER BY day, created_at"
+        ).fetchall()]
+
+
+def get_all_game_scores():
+    """Return {player_id: {game_id: points_or_None}} for every finished game.
+
+    None means the player did not participate (or had no entry for that game).
+    """
+    with get_db() as db:
+        rows = db.execute("""
+            SELECT
+                tp.player_id,
+                g.id  AS game_id,
+                CASE
+                    WHEN gt.did_not_participate = 1 THEN NULL
+                    ELSE COALESCE(gt.points_override, sc.points, 0)
+                END AS points
+            FROM team_players tp
+            JOIN game_teams gt ON gt.id = tp.team_id
+            JOIN games g       ON g.id = gt.game_id AND g.status = 'termine'
+            LEFT JOIN score_config sc ON sc.game_type = g.type
+                                     AND sc.placement = gt.placement
+        """).fetchall()
+
+    scores: dict = {}
+    for row in rows:
+        pid = row["player_id"]
+        gid = row["game_id"]
+        scores.setdefault(pid, {})[gid] = row["points"]
+    return scores
+
+
 def get_player_game_breakdown(player_id):
     """Return point detail per game for a given player."""
     with get_db() as db:
