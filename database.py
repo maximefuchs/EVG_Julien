@@ -145,21 +145,17 @@ def get_all_game_scores():
     with get_db() as db:
         rows = db.execute("""
             SELECT
-                p.id  AS player_id,
+                tp.player_id,
                 g.id  AS game_id,
                 CASE
                     WHEN gt.did_not_participate = 1 THEN NULL
-                    WHEN gt.id IS NULL              THEN NULL
                     ELSE COALESCE(gt.points_override, sc.points, 0)
                 END AS points
-            FROM players p
-            CROSS JOIN games g
-            LEFT JOIN team_players tp ON tp.player_id = p.id
-            LEFT JOIN game_teams gt   ON gt.id = tp.team_id
-                                     AND gt.game_id = g.id
+            FROM team_players tp
+            JOIN game_teams gt ON gt.id = tp.team_id
+            JOIN games g       ON g.id = gt.game_id AND g.status = 'termine'
             LEFT JOIN score_config sc ON sc.game_type = g.type
                                      AND sc.placement = gt.placement
-            WHERE g.status = 'termine'
         """).fetchall()
 
     scores: dict = {}
