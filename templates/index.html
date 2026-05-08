@@ -22,13 +22,13 @@
             <tr>
               <th class="text-center" style="width:50px;">#</th>
               <th>Joueur</th>
+              <th class="text-center" style="min-width:90px;">Total</th>
               {% for game in finished_games %}
               <th class="text-center lb-game-col" data-game-id="{{ game.id }}">
                 {{ game.name }}
                 <div class="lb-day-label">{{ 'Sam.' if game.day == 'samedi' else 'Dim.' }}</div>
               </th>
               {% endfor %}
-              <th class="text-center" style="min-width:90px;">Total</th>
             </tr>
           </thead>
           <tbody id="leaderboard-tbody">
@@ -45,6 +45,9 @@
                 <a href="{{ url_for('joueur_detail', player_id=entry.id) }}"
                    class="player-name-link">{{ entry.name }}</a>
               </td>
+              <td class="text-center">
+                <span class="points-badge">{{ entry.total_points }} pts</span>
+              </td>
               {% for game in finished_games %}
               {% set pts = player_scores.get(game.id) %}
               <td class="text-center lb-game-cell">
@@ -55,9 +58,6 @@
                 {% endif %}
               </td>
               {% endfor %}
-              <td class="text-center">
-                <span class="points-badge">{{ entry.total_points }} pts</span>
-              </td>
             </tr>
             {% else %}
             <tr>

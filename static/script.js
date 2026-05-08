@@ -31,14 +31,14 @@
     const fixed = `
       <tr>
         <th class="text-center" style="width:50px;">#</th>
-        <th>Joueur</th>`;
+        <th>Joueur</th>
+        <th class="text-center" style="min-width:90px;">Total</th>`;
     const gameCols = games.map(g => `
         <th class="text-center lb-game-col" data-game-id="${g.id}">
           ${escapeHtml(g.name)}
           <div class="lb-day-label">${g.day === 'samedi' ? 'Sam.' : 'Dim.'}</div>
         </th>`).join("");
     return fixed + gameCols + `
-        <th class="text-center" style="min-width:90px;">Total</th>
       </tr>`;
   }
 
@@ -58,8 +58,8 @@
       <tr class="${rowClass}">
         <td class="text-center">${rankIcon(entry.rank)}</td>
         <td><a href="/joueur/${entry.id}" class="player-name-link">${escapeHtml(entry.name)}</a></td>
-        ${gameCells}
         <td class="text-center"><span class="points-badge">${entry.total_points} pts</span></td>
+        ${gameCells}
       </tr>`;
   }
 
