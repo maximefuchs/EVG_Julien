@@ -266,3 +266,138 @@ a:hover { color: #ffd966; text-decoration: none; }
   .admin-sidebar { min-height: auto; border-right: none; border-bottom: 1px solid #2a2a4a; }
   .points-badge { font-size: 0.8rem; padding: 3px 8px; }
 }
+
+/* =========================================================
+   NBA Devinette
+   ========================================================= */
+
+/* Titre */
+.nba-title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--gold);
+  letter-spacing: 2px;
+}
+
+/* Bannière victoire */
+.nba-found-banner {
+  background: linear-gradient(135deg, #1b5e20, #2e7d32);
+  border: 1px solid #4caf50;
+  color: #c8e6c9;
+  border-radius: 12px;
+  padding: 16px 24px;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+
+/* Zone de saisie */
+.nba-search-input {
+  font-size: 1.1rem;
+  background-color: #0f0f23 !important;
+  border: 2px solid #2a2a4a !important;
+  color: #e0e0e0 !important;
+  border-radius: 10px !important;
+}
+.nba-search-input:focus {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 0.2rem rgba(245, 197, 24, 0.2) !important;
+}
+
+/* Autocomplete dropdown */
+.nba-autocomplete-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background-color: #16213e;
+  border: 1px solid #2a2a4a;
+  border-radius: 0 0 10px 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.nba-autocomplete-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #e0e0e0;
+  font-size: 0.95rem;
+  border-bottom: 1px solid #1e1e3a;
+  transition: background 0.15s;
+}
+.nba-autocomplete-item:last-child { border-bottom: none; }
+.nba-autocomplete-item:hover,
+.nba-autocomplete-item.active {
+  background-color: #1e1e3a;
+  color: var(--gold);
+}
+
+/* Tableau des devinettes */
+.nba-guess-table th {
+  background-color: #0f0f23;
+  color: var(--gold);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 1px;
+  border-color: #2a2a4a;
+  white-space: nowrap;
+  padding: 10px 8px;
+}
+.nba-guess-table td {
+  border-color: #2a2a4a;
+  vertical-align: middle;
+  padding: 8px;
+}
+
+/* Cellules colorées */
+.nba-cell {
+  font-weight: 600;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  text-align: center;
+  white-space: nowrap;
+}
+.nba-vert  { background-color: #1b3a1b; color: #69f06d; border: 1px solid #2d7d32 !important; }
+.nba-jaune { background-color: #3a3000; color: #ffe066; border: 1px solid #7a6a00 !important; }
+.nba-rouge { background-color: #3a1515; color: #ef9a9a; border: 1px solid #7d3030 !important; }
+
+/* Flèches directionnelles */
+.nba-arrow {
+  font-size: 1rem;
+  margin-left: 4px;
+}
+.nba-vert  .nba-arrow { color: #69f06d; }
+.nba-rouge .nba-arrow { color: #ef9a9a; }
+
+/* Nom du joueur */
+.nba-player-name {
+  min-width: 140px;
+  color: #e0e0e0;
+}
+.nba-correct-name { color: #69f06d; }
+
+/* Légende */
+.nba-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.8rem;
+}
+.nba-legend-item {
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.nba-legend-item.nba-vert  { background-color: #1b3a1b; color: #69f06d; }
+.nba-legend-item.nba-jaune { background-color: #3a3000; color: #ffe066; }
+.nba-legend-item.nba-rouge { background-color: #3a1515; color: #ef9a9a; }
+
+/* Responsive: scroll horizontal sur mobile */
+@media (max-width: 768px) {
+  .nba-guess-table th,
+  .nba-guess-table td { font-size: 0.75rem; padding: 6px 4px; }
+  .nba-player-name { min-width: 100px; }
+}
