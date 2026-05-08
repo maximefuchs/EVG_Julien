@@ -20,10 +20,11 @@
 
   <!-- Bannière victoire -->
   <div id="found-banner" class="nba-found-banner {% if not game.found %}d-none{% endif %}">
-    🎉 Bravo ! Le joueur mystère a été trouvé en {{ game.guesses | length }} devinette{{ 's' if game.guesses | length > 1 else '' }} !
-    <span id="found-name" class="fw-bold">
-      {% if game.found and game.guesses %}{{ game.guesses[-1]['_player_name'] }}{% endif %}
-    </span>
+    {% if game.found and game.guesses %}
+    🎉 Bravo ! Le joueur mystère a été trouvé en <strong>{{ game.guesses | length }}</strong>
+    devinette{{ 's' if game.guesses | length > 1 else '' }} !
+    <span class="fw-bold ms-1">{{ game.guesses[-1]['_player_name'] }}</span>
+    {% endif %}
   </div>
 
   <!-- Zone de saisie -->
@@ -39,20 +40,20 @@
       >
       <div id="autocomplete-list" class="nba-autocomplete-list d-none"></div>
     </div>
-    <p class="text-muted small mt-2 text-center">
+    <p class="text-muted small mt-2 text-center" id="guess-count">
       {{ game.guesses | length }} devinette{{ 's' if game.guesses | length != 1 else '' }} effectuée{{ 's' if game.guesses | length != 1 else '' }}
     </p>
   </div>
   {% elif target_set and game.found %}
-  <p class="text-center text-muted small mb-4">
+  <p class="text-center text-muted small mb-4" id="guess-count">
     {{ game.guesses | length }} devinette{{ 's' if game.guesses | length != 1 else '' }} au total.
   </p>
   {% endif %}
 
-  <!-- Tableau des devinettes -->
-  {% if game.guesses %}
-  <div class="table-responsive">
-    <table class="table nba-guess-table text-center" id="guess-table">
+  <!-- Tableau des devinettes — toujours présent dans le DOM -->
+  <div class="table-responsive" id="guess-table-container"
+       style="{{ 'display:none' if not game.guesses else '' }}">
+    <table class="table nba-guess-table text-center">
       <thead>
         <tr>
           <th class="text-start">Joueur</th>
@@ -84,8 +85,13 @@
       </tbody>
     </table>
   </div>
-  {% elif target_set %}
-  <p class="text-center text-muted">Aucune devinette pour l'instant.</p>
+
+  <!-- Placeholder "aucune devinette" — masqué si des devinettes existent -->
+  {% if target_set %}
+  <p class="text-center text-muted" id="no-guesses-msg"
+     {% if game.guesses %}style="display:none"{% endif %}>
+    Aucune devinette pour l'instant.
+  </p>
   {% endif %}
 
   <!-- Légende -->
@@ -99,9 +105,7 @@
 </div>
 {% endblock %}
 
-{# ---------------------------------------------------------------------------
-   Macro pour afficher une cellule colorée avec flèche optionnelle
-   --------------------------------------------------------------------------- #}
+{# Macro pour afficher une cellule colorée avec flèche optionnelle #}
 {% macro _render_cell(col) %}
 <td class="nba-cell nba-{{ col['result'] }}">
   {{ col['value'] }}
@@ -113,11 +117,13 @@
 {% block extra_js %}
 <script>
 (function () {
-  const searchInput   = document.getElementById('player-search');
-  const autocomplete  = document.getElementById('autocomplete-list');
-  const tbody         = document.getElementById('guess-tbody');
-  const foundBanner   = document.getElementById('found-banner');
-  const foundName     = document.getElementById('found-name');
+  const searchInput    = document.getElementById('player-search');
+  const autocomplete   = document.getElementById('autocomplete-list');
+  const tbody          = document.getElementById('guess-tbody');
+  const tableContainer = document.getElementById('guess-table-container');
+  const noGuessesMsg   = document.getElementById('no-guesses-msg');
+  const foundBanner    = document.getElementById('found-banner');
+  const guessCount     = document.getElementById('guess-count');
 
   if (!searchInput) return; // Jeu non configuré ou terminé
 
@@ -141,7 +147,7 @@
         autocomplete.innerHTML = '';
         players.forEach(p => {
           const item = document.createElement('div');
-          item.className = 'nba-autocomplete-item';
+          item.className   = 'nba-autocomplete-item';
           item.textContent = p.full_name;
           item.dataset.id  = p.id;
           item.addEventListener('mousedown', function (e) {
@@ -156,8 +162,8 @@
   }
 
   function selectPlayer(id, name) {
-    selectedPlayerId      = id;
-    searchInput.value     = name;
+    selectedPlayerId  = id;
+    searchInput.value = name;
     hideAutocomplete();
     submitGuess();
   }
@@ -174,30 +180,20 @@
     }
   });
 
-  // Navigation clavier dans la liste
+  // Navigation clavier
   searchInput.addEventListener('keydown', function (e) {
-    const items = autocomplete.querySelectorAll('.nba-autocomplete-item');
+    const items  = autocomplete.querySelectorAll('.nba-autocomplete-item');
     const active = autocomplete.querySelector('.nba-autocomplete-item.active');
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (!active && items.length) { items[0].classList.add('active'); return; }
-      if (active) {
-        active.classList.remove('active');
-        const next = active.nextElementSibling;
-        if (next) next.classList.add('active');
-      }
+      if (active) { active.classList.remove('active'); const nx = active.nextElementSibling; if (nx) nx.classList.add('active'); }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      if (active) {
-        active.classList.remove('active');
-        const prev = active.previousElementSibling;
-        if (prev) prev.classList.add('active');
-      }
+      if (active) { active.classList.remove('active'); const pv = active.previousElementSibling; if (pv) pv.classList.add('active'); }
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (active) {
-        selectPlayer(active.dataset.id, active.textContent.trim());
-      }
+      if (active) selectPlayer(active.dataset.id, active.textContent.trim());
     } else if (e.key === 'Escape') {
       hideAutocomplete();
     }
@@ -206,7 +202,7 @@
   // ── Soumission d'une devinette ─────────────────────────────────────────────
   function submitGuess() {
     if (!selectedPlayerId) return;
-    const pid = selectedPlayerId;
+    const pid    = selectedPlayerId;
     selectedPlayerId  = null;
     searchInput.value = '';
     searchInput.disabled = true;
@@ -221,6 +217,7 @@
       searchInput.disabled = false;
       if (data.error) { showError(data.error); return; }
       renderGuesses(data.guesses);
+      updateCount(data.guesses.length);
       if (data.found) { showFound(data.guesses); }
       else { searchInput.focus(); }
     })
@@ -234,18 +231,23 @@
   const COLS = ['equipe','conference','division','position','numero','taille','age'];
 
   function renderGuesses(guesses) {
-    if (!tbody) return;
+    // Afficher la table, masquer le placeholder
+    if (tableContainer) tableContainer.style.display = '';
+    if (noGuessesMsg)   noGuessesMsg.style.display   = 'none';
+
     tbody.innerHTML = '';
-    // Afficher du plus récent au plus ancien (reverse)
-    const reversed = guesses.slice().reverse();
-    reversed.forEach(guess => {
+    guesses.slice().reverse().forEach(guess => {
       const tr = document.createElement('tr');
-      // Nom
+
+      // Colonne nom
       const nameTd = document.createElement('td');
-      nameTd.className = 'text-start fw-semibold nba-player-name' + (guess._correct ? ' nba-correct-name' : '');
-      nameTd.innerHTML = escHtml(guess._player_name) + (guess._correct ? ' <span>✅</span>' : '');
+      nameTd.className = 'text-start fw-semibold nba-player-name' +
+                         (guess._correct ? ' nba-correct-name' : '');
+      nameTd.innerHTML = escHtml(guess._player_name) +
+                         (guess._correct ? ' <span>✅</span>' : '');
       tr.appendChild(nameTd);
-      // Colonnes
+
+      // Colonnes de données
       COLS.forEach(col => {
         const td = document.createElement('td');
         td.className = 'nba-cell nba-' + guess[col].result;
@@ -255,25 +257,35 @@
         td.innerHTML = html;
         tr.appendChild(td);
       });
+
       tbody.appendChild(tr);
     });
   }
 
+  function updateCount(n) {
+    if (!guessCount) return;
+    guessCount.textContent =
+      n + ' devinette' + (n !== 1 ? 's' : '') + ' effectuée' + (n !== 1 ? 's' : '');
+  }
+
   function showFound(guesses) {
-    if (!foundBanner) return;
     const last = guesses[guesses.length - 1];
-    foundBanner.classList.remove('d-none');
-    const countSpan = foundBanner.querySelector('span:first-child') || foundBanner;
-    if (foundName) foundName.textContent = last._player_name;
-    // Mettre à jour le texte du nombre de devinettes
-    const n = guesses.length;
-    foundBanner.innerHTML =
-      '🎉 Bravo ! Le joueur mystère a été trouvé en <strong>' + n + '</strong> devinette' +
-      (n > 1 ? 's' : '') + ' ! <span class="fw-bold ms-1">' + escHtml(last._player_name) + '</span>';
-    if (searchInput) searchInput.disabled = true;
-    // Masquer la zone de saisie proprement
+    const n    = guesses.length;
+    if (foundBanner) {
+      foundBanner.innerHTML =
+        '🎉 Bravo ! Le joueur mystère a été trouvé en <strong>' + n + '</strong> devinette' +
+        (n > 1 ? 's' : '') + ' ! <span class="fw-bold ms-1">' +
+        escHtml(last._player_name) + '</span>';
+      foundBanner.classList.remove('d-none');
+    }
+    // Masquer la zone de saisie
     const zone = searchInput.closest('.nba-input-zone');
     if (zone) zone.classList.add('d-none');
+    // Afficher le total (sans "effectuées")
+    if (guessCount) {
+      guessCount.textContent = n + ' devinette' + (n > 1 ? 's' : '') + ' au total.';
+      guessCount.style.display = '';
+    }
   }
 
   function showError(msg) {
@@ -282,15 +294,16 @@
     const div = document.createElement('div');
     div.id        = 'nba-error-alert';
     div.className = 'alert alert-danger alert-dismissible fade show mt-2';
-    div.innerHTML = escHtml(msg) + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    div.innerHTML = escHtml(msg) +
+                    '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
     searchInput.closest('.nba-input-zone').after(div);
     setTimeout(() => { if (div.parentNode) div.remove(); }, 4000);
   }
 
   function escHtml(s) {
     return String(s)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   searchInput.focus();
