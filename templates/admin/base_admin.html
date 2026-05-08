@@ -50,6 +50,10 @@
            href="{{ url_for('admin_configuration') }}">
           <i>⚙️</i> Configuration
         </a>
+        <a class="nav-link {% if request.endpoint == 'admin_nba' %}active{% endif %}"
+           href="{{ url_for('admin_nba') }}">
+          <i>🏀</i> NBA Devinette
+        </a>
         <hr class="my-2">
         <a class="nav-link {% if request.endpoint == 'admin_db_import' %}active{% endif %}"
            href="{{ url_for('admin_db_import') }}">

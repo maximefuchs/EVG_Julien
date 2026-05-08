@@ -9,6 +9,7 @@ from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 import database as db
+import nba_game
 
 load_dotenv()  # Load .env in development (no-op in production if vars already set)
 
@@ -500,6 +501,85 @@ def admin_db_import():
         flash("Base de données restaurée avec succès.", "success")
         return redirect(url_for("admin_dashboard"))
     return render_template("admin/db_import.html")
+
+
+# ---------------------------------------------------------------------------
+# NBA – Jeu public
+# ---------------------------------------------------------------------------
+
+@app.route("/nba/")
+def nba_jeu():
+    return render_template(
+        "nba/jeu.html",
+        game=nba_game.game_state,
+        target_set=(nba_game.game_state["target"] is not None),
+    )
+
+
+@app.route("/nba/devine", methods=["POST"])
+@csrf.exempt
+def nba_devine():
+    data = request.get_json(silent=True) or {}
+    player_id = data.get("player_id")
+    if not player_id:
+        return jsonify({"error": "Identifiant de joueur manquant."}), 400
+    if nba_game.game_state["target"] is None:
+        return jsonify({"error": "Aucun joueur mystère n'est défini. Demande à l'admin de configurer le jeu."}), 400
+    if nba_game.game_state["found"]:
+        return jsonify({"error": "Le joueur a déjà été trouvé !"}), 400
+    try:
+        nba_game.add_guess(int(player_id))
+        return jsonify({
+            "guesses": nba_game.game_state["guesses"],
+            "found":   nba_game.game_state["found"],
+        })
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/nba/joueurs")
+def api_nba_joueurs():
+    q = request.args.get("q", "").strip()
+    if len(q) < 2:
+        return jsonify([])
+    return jsonify(nba_game.search_players(q))
+
+
+# ---------------------------------------------------------------------------
+# NBA – Administration
+# ---------------------------------------------------------------------------
+
+@app.route("/admin/nba/")
+@login_required
+def admin_nba():
+    return render_template("admin/nba_setup.html", game=nba_game.game_state)
+
+
+@app.route("/admin/nba/joueur", methods=["POST"])
+@login_required
+def admin_nba_joueur():
+    player_id = request.form.get("player_id", "").strip()
+    if not player_id or not player_id.isdigit():
+        flash("Sélectionne un joueur dans la liste de suggestions.", "danger")
+        return redirect(url_for("admin_nba"))
+    try:
+        player = nba_game.set_target(int(player_id))
+        flash(
+            f"Joueur mystère défini : {player['name']} ({player['team_name']}). "
+            "Le jeu est prêt !",
+            "success",
+        )
+    except Exception as exc:
+        flash(f"Erreur lors de la récupération des données : {exc}", "danger")
+    return redirect(url_for("admin_nba"))
+
+
+@app.route("/admin/nba/reset", methods=["POST"])
+@login_required
+def admin_nba_reset():
+    nba_game.reset_game()
+    flash("Jeu NBA réinitialisé.", "success")
+    return redirect(url_for("admin_nba"))
 
 
 # ---------------------------------------------------------------------------

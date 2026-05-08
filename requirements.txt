@@ -3,3 +3,4 @@ flask-wtf>=1.2
 werkzeug>=3.0
 gunicorn>=21.0
 python-dotenv>=1.0
+nba_api>=1.4

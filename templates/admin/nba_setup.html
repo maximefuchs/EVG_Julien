@@ -1,0 +1,170 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Admin – NBA Devinette{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">🏀 Jeu NBA — Configuration</h2>
+
+<!-- Joueur mystère actuel -->
+<div class="card mb-4">
+  <div class="card-header">Joueur mystère actuel</div>
+  <div class="card-body">
+    {% if game.target %}
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <div>
+        <span class="fs-4 fw-bold" style="color:var(--gold)">{{ game.target.name }}</span>
+        <span class="text-muted ms-2">{{ game.target.team_name }}</span>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <span class="badge bg-secondary">{{ game.target.conference }}</span>
+        <span class="badge bg-secondary">{{ game.target.division }}</span>
+        <span class="badge bg-secondary">{{ game.target.position }}</span>
+        <span class="badge bg-secondary">#{{ game.target.jersey }}</span>
+        <span class="badge bg-secondary">{{ game.target.height_disp }}</span>
+        <span class="badge bg-secondary">{{ game.target.age }} ans</span>
+      </div>
+      <div class="ms-auto">
+        <span class="text-muted small">
+          {{ game.guesses | length }} devinette{{ 's' if game.guesses | length != 1 else '' }}
+          {% if game.found %} — <span class="text-success fw-bold">Trouvé !</span>{% endif %}
+        </span>
+      </div>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">Aucun joueur mystère défini pour l'instant.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Définir un nouveau joueur mystère -->
+<div class="card mb-4">
+  <div class="card-header">Définir le joueur mystère</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Tape le nom d'un joueur NBA actif, sélectionne-le dans la liste, puis clique sur
+      <strong>Définir comme joueur mystère</strong>. Les éventuelles devinettes en cours
+      seront effacées.
+    </p>
+    <form method="POST" action="{{ url_for('admin_nba_joueur') }}" id="nba-form">
+      <input type="hidden" name="player_id" id="player-id-input">
+      <div class="position-relative mb-3">
+        <input
+          type="text"
+          id="admin-player-search"
+          class="form-control"
+          placeholder="Ex : LeBron James, Nikola Jokic..."
+          autocomplete="off"
+        >
+        <div id="admin-autocomplete-list" class="nba-autocomplete-list d-none"></div>
+      </div>
+      <button type="submit" class="btn btn-gold" id="set-btn" disabled>
+        Définir comme joueur mystère
+      </button>
+      <span id="selected-name" class="ms-3 text-muted small"></span>
+    </form>
+  </div>
+</div>
+
+<!-- Réinitialiser le jeu -->
+{% if game.target %}
+<div class="card border-danger">
+  <div class="card-header text-danger">Réinitialiser le jeu</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Supprime le joueur mystère et efface toutes les devinettes.
+      Cette action est irréversible.
+    </p>
+    <form method="POST" action="{{ url_for('admin_nba_reset') }}"
+          onsubmit="return confirm('Réinitialiser le jeu NBA ?')">
+      <button type="submit" class="btn btn-danger">Réinitialiser</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const searchInput  = document.getElementById('admin-player-search');
+  const autocomplete = document.getElementById('admin-autocomplete-list');
+  const playerIdInput= document.getElementById('player-id-input');
+  const setBtn       = document.getElementById('set-btn');
+  const selectedName = document.getElementById('selected-name');
+
+  let debounceTimer = null;
+
+  searchInput.addEventListener('input', function () {
+    clearTimeout(debounceTimer);
+    playerIdInput.value = '';
+    setBtn.disabled     = true;
+    selectedName.textContent = '';
+    const q = this.value.trim();
+    if (q.length < 2) { hideAutocomplete(); return; }
+    debounceTimer = setTimeout(() => fetchSuggestions(q), 200);
+  });
+
+  function fetchSuggestions(q) {
+    fetch('/api/nba/joueurs?q=' + encodeURIComponent(q))
+      .then(r => r.json())
+      .then(players => {
+        if (!players.length) { hideAutocomplete(); return; }
+        autocomplete.innerHTML = '';
+        players.forEach(p => {
+          const item = document.createElement('div');
+          item.className   = 'nba-autocomplete-item';
+          item.textContent = p.full_name;
+          item.dataset.id  = p.id;
+          item.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            selectPlayer(p.id, p.full_name);
+          });
+          autocomplete.appendChild(item);
+        });
+        autocomplete.classList.remove('d-none');
+      })
+      .catch(() => hideAutocomplete());
+  }
+
+  function selectPlayer(id, name) {
+    playerIdInput.value = id;
+    searchInput.value   = name;
+    selectedName.textContent = name;
+    setBtn.disabled     = false;
+    hideAutocomplete();
+    searchInput.focus();
+  }
+
+  function hideAutocomplete() {
+    autocomplete.classList.add('d-none');
+    autocomplete.innerHTML = '';
+  }
+
+  document.addEventListener('click', function (e) {
+    if (!searchInput.contains(e.target) && !autocomplete.contains(e.target)) {
+      hideAutocomplete();
+    }
+  });
+
+  searchInput.addEventListener('keydown', function (e) {
+    const items  = autocomplete.querySelectorAll('.nba-autocomplete-item');
+    const active = autocomplete.querySelector('.nba-autocomplete-item.active');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!active && items.length) { items[0].classList.add('active'); return; }
+      if (active) { active.classList.remove('active'); const nx = active.nextElementSibling; if (nx) nx.classList.add('active'); }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (active) { active.classList.remove('active'); const pv = active.previousElementSibling; if (pv) pv.classList.add('active'); }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (active) selectPlayer(active.dataset.id, active.textContent.trim());
+    } else if (e.key === 'Escape') {
+      hideAutocomplete();
+    }
+  });
+
+  searchInput.focus();
+})();
+</script>
+{% endblock %}
