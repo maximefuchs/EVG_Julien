@@ -7,11 +7,18 @@
 // ---------------------------------------------------------------------------
 
 (function () {
-  const table = document.getElementById("leaderboard-tbody");
-  if (!table) return;
+  const tbody     = document.getElementById("leaderboard-tbody");
+  const thead     = document.getElementById("leaderboard-thead");
+  if (!tbody) return;
 
   const indicator = document.getElementById("refresh-indicator");
   const INTERVAL  = 30000; // 30 seconds
+
+  // Read the current game-column IDs from the header (set by the server on initial render)
+  function currentGameIds() {
+    return Array.from(thead.querySelectorAll("th[data-game-id]"))
+                .map(th => th.dataset.gameId);
+  }
 
   function rankIcon(rank) {
     if (rank === 1) return '<span class="rank-1">🥇</span>';
@@ -20,39 +27,66 @@
     return `<span class="rank-other">${rank}</span>`;
   }
 
-  function buildRow(entry, index) {
+  function buildHeaders(games) {
+    const fixed = `
+      <tr>
+        <th class="text-center" style="width:50px;">#</th>
+        <th>Joueur</th>`;
+    const gameCols = games.map(g => `
+        <th class="text-center lb-game-col" data-game-id="${g.id}">
+          ${escapeHtml(g.name)}
+          <div class="lb-day-label">${g.day === 'samedi' ? 'Sam.' : 'Dim.'}</div>
+        </th>`).join("");
+    return fixed + gameCols + `
+        <th class="text-center" style="min-width:90px;">Total</th>
+      </tr>`;
+  }
+
+  function buildRow(entry, index, games) {
     const isLeader = index === 0 && entry.total_points > 0;
     const rowClass = isLeader ? "row-leader" : "";
+
+    const gameCells = games.map(g => {
+      const pts = entry.game_scores ? entry.game_scores[String(g.id)] : undefined;
+      if (pts === null || pts === undefined) {
+        return `<td class="text-center lb-game-cell"><span class="lb-dnp">—</span></td>`;
+      }
+      return `<td class="text-center lb-game-cell"><span class="lb-pts">${pts}</span></td>`;
+    }).join("");
+
     return `
       <tr class="${rowClass}">
         <td class="text-center">${rankIcon(entry.rank)}</td>
-        <td>
-          <a href="/joueur/${entry.id}" class="player-name-link">${escapeHtml(entry.name)}</a>
-        </td>
-        <td class="text-center">
-          <span class="points-badge">${entry.total_points} pts</span>
-        </td>
-        <td class="text-center text-muted">${entry.games_played}</td>
+        <td><a href="/joueur/${entry.id}" class="player-name-link">${escapeHtml(entry.name)}</a></td>
+        ${gameCells}
+        <td class="text-center"><span class="points-badge">${entry.total_points} pts</span></td>
       </tr>`;
   }
 
   function escapeHtml(str) {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+    return String(str)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
   function refresh() {
-    const url = "/api/leaderboard";
-
     if (indicator) { indicator.textContent = "Actualisation…"; indicator.classList.add("refreshing"); }
 
-    fetch(url)
+    fetch("/api/leaderboard")
       .then(r => r.json())
       .then(data => {
-        table.innerHTML = data.map(buildRow).join("");
+        const { leaderboard, games } = data;
+
+        // If the set of finished games changed, update headers too
+        const freshIds  = games.map(g => String(g.id));
+        const currentIds = currentGameIds();
+        const headersChanged = JSON.stringify(freshIds) !== JSON.stringify(currentIds);
+        if (headersChanged) {
+          thead.innerHTML = buildHeaders(games);
+        }
+
+        tbody.innerHTML = leaderboard.map((e, i) => buildRow(e, i, games)).join("");
+
         if (indicator) {
           const now = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
           indicator.textContent = `Mis à jour à ${now}`;

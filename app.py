@@ -64,15 +64,27 @@ def login_required(f):
 
 @app.route("/")
 def index():
-    leaderboard = _add_ranks(db.get_leaderboard())
-    return render_template("index.html", leaderboard=leaderboard)
+    leaderboard    = _add_ranks(db.get_leaderboard())
+    finished_games = db.get_finished_games()
+    game_scores    = db.get_all_game_scores()
+    return render_template("index.html",
+                           leaderboard=leaderboard,
+                           finished_games=finished_games,
+                           game_scores=game_scores)
 
 
 @app.route("/api/leaderboard")
 def api_leaderboard():
-    leaderboard = _add_ranks(db.get_leaderboard())
-    leaderboard = _add_ranks(leaderboard)
-    return jsonify(leaderboard)
+    leaderboard    = _add_ranks(db.get_leaderboard())
+    finished_games = db.get_finished_games()
+    game_scores    = db.get_all_game_scores()
+    # Embed per-game scores into each leaderboard entry (JSON keys must be strings)
+    for entry in leaderboard:
+        entry["game_scores"] = {
+            str(gid): pts
+            for gid, pts in game_scores.get(entry["id"], {}).items()
+        }
+    return jsonify({"leaderboard": leaderboard, "games": finished_games})
 
 
 @app.route("/joueur/<int:player_id>")
