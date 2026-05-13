@@ -17,9 +17,11 @@
       <span class="badge ms-2
         {% if game.type == 'karting' %}bg-warning text-dark
         {% elif game.type == 'mini_jeu_ind' %}bg-success
+        {% elif game.type == 'bonus' %}bg-bonus
         {% else %}bg-primary{% endif %}">
         {% if game.type == 'karting' %}Karting
         {% elif game.type == 'mini_jeu_ind' %}Mini jeu individuel
+        {% elif game.type == 'bonus' %}Jeu bonus
         {% else %}Mini jeu{% endif %}
       </span>
     </div>
@@ -80,6 +82,7 @@
               <option value="mini_jeu">Mini jeu en équipes</option>
               <option value="mini_jeu_ind">Mini jeu individuel</option>
               <option value="karting">Karting</option>
+              <option value="bonus">Jeu bonus (zéro-somme)</option>
             </select>
           </div>
         </div>

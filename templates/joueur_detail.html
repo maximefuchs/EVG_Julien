@@ -35,7 +35,7 @@
             <td>{{ b.team_name }}</td>
             <td class="text-center">{{ b.placement }}e</td>
             <td class="text-center">
-              <span class="points-badge" style="font-size:0.85rem;">+{{ b.points }}</span>
+              <span class="points-badge" style="font-size:0.85rem;">{% if b.points > 0 %}+{% endif %}{{ b.points }}</span>
             </td>
           </tr>
           {% endfor %}

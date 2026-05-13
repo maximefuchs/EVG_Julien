@@ -259,7 +259,7 @@ def admin_jeux_nouveau():
     name      = request.form.get("name", "").strip()
     day       = request.form.get("day")
     game_type = request.form.get("type")
-    if not name or day not in ("samedi", "dimanche") or game_type not in ("mini_jeu", "karting", "mini_jeu_ind"):
+    if not name or day not in ("samedi", "dimanche") or game_type not in ("mini_jeu", "karting", "mini_jeu_ind", "bonus"):
         flash("Données invalides.", "danger")
         return redirect(url_for("admin_jeux"))
     game_id = db.create_game(name, day, game_type)
@@ -281,7 +281,11 @@ def admin_jeu_detail(game_id):
     teams   = db.get_teams_for_game(game_id)
     players = db.get_all_players()
     free_players = db.get_players_not_in_game(game_id)
-    score_cfg = db.get_score_config(game["type"])
+    if game["type"] == "bonus":
+        n = len(teams)
+        score_cfg = [{"placement": k, "points": n + 1 - 2 * k} for k in range(1, n + 1)]
+    else:
+        score_cfg = db.get_score_config(game["type"])
     return render_template("admin/jeu_detail.html",
                            game=game, teams=teams,
                            players=players, free_players=free_players,
@@ -348,6 +352,31 @@ def admin_jeu_equipes(game_id):
     return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
 
+@app.route("/admin/jeux/<int:game_id>/participants", methods=["POST"])
+@login_required
+def admin_jeu_participants(game_id):
+    game = db.get_game(game_id)
+    if not game or game["type"] != "bonus":
+        flash("Jeu introuvable ou type incorrect.", "danger")
+        return redirect(url_for("admin_jeux"))
+    if game["status"] == "termine":
+        flash("Ce jeu est terminé, les participants ne peuvent plus être modifiés.", "warning")
+        return redirect(url_for("admin_jeu_detail", game_id=game_id))
+
+    raw_ids = request.form.getlist("player_ids[]")
+    player_ids = [int(pid) for pid in raw_ids if pid.isdigit()]
+
+    if len(player_ids) < 2:
+        flash("Sélectionnez au moins 2 participants.", "warning")
+        return redirect(url_for("admin_jeu_detail", game_id=game_id))
+
+    db.setup_bonus_game(game_id, player_ids)
+    if game["status"] == "en_attente":
+        db.update_game_status(game_id, "en_cours")
+    flash("Participants sauvegardés.", "success")
+    return redirect(url_for("admin_jeu_detail", game_id=game_id))
+
+
 @app.route("/admin/jeux/<int:game_id>/resultats", methods=["POST"])
 @login_required
 def admin_jeu_resultats(game_id):
@@ -385,7 +414,11 @@ def admin_jeu_resultats(game_id):
             team["points_override"] = overrides.get(team["id"], team.get("points_override"))
             team["did_not_participate"] = 1 if team["id"] in dnp_team_ids else 0
         flash(error, "danger")
-        score_cfg = db.get_score_config(game["type"])
+        if game["type"] == "bonus":
+            n = len(teams)
+            score_cfg = [{"placement": k, "points": n + 1 - 2 * k} for k in range(1, n + 1)]
+        else:
+            score_cfg = db.get_score_config(game["type"])
         players = db.get_all_players()
         free_players = db.get_players_not_in_game(game_id)
         return render_template("admin/jeu_detail.html",

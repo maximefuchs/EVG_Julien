@@ -29,7 +29,7 @@ def init_db():
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 name       TEXT NOT NULL,
                 day        TEXT NOT NULL CHECK(day IN ('samedi','dimanche')),
-                type       TEXT NOT NULL CHECK(type IN ('mini_jeu','karting','mini_jeu_ind')),
+                type       TEXT NOT NULL CHECK(type IN ('mini_jeu','karting','mini_jeu_ind','bonus')),
                 status     TEXT NOT NULL DEFAULT 'en_attente'
                                CHECK(status IN ('en_attente','en_cours','termine')),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -65,6 +65,29 @@ def init_db():
             db.execute("ALTER TABLE game_teams ADD COLUMN points_override INTEGER")
         if "did_not_participate" not in cols:
             db.execute("ALTER TABLE game_teams ADD COLUMN did_not_participate INTEGER NOT NULL DEFAULT 0")
+
+        # Migration: add 'bonus' game type to games table CHECK constraint
+        schema_row = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='games'"
+        ).fetchone()
+        if schema_row and "'bonus'" not in schema_row[0]:
+            db.executescript("""
+                PRAGMA foreign_keys = OFF;
+                CREATE TABLE games_new (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name       TEXT NOT NULL,
+                    day        TEXT NOT NULL CHECK(day IN ('samedi','dimanche')),
+                    type       TEXT NOT NULL CHECK(type IN ('mini_jeu','karting','mini_jeu_ind','bonus')),
+                    status     TEXT NOT NULL DEFAULT 'en_attente'
+                                   CHECK(status IN ('en_attente','en_cours','termine')),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                INSERT INTO games_new SELECT * FROM games;
+                DROP TABLE games;
+                ALTER TABLE games_new RENAME TO games;
+                PRAGMA foreign_keys = ON;
+            """)
+            db.commit()
 
         # Default score config (only inserted if table is empty)
         existing = db.execute("SELECT COUNT(*) FROM score_config").fetchone()[0]
@@ -420,6 +443,25 @@ def setup_individual_game(game_id):
                 db.execute(
                     "INSERT INTO team_players (team_id, player_id) VALUES (?,?)",
                     [cur.lastrowid, p["id"]])
+        db.commit()
+
+
+def setup_bonus_game(game_id, player_ids):
+    """
+    For bonus games: create one game_team per selected player.
+    Replaces any previous participant list.
+    """
+    with get_db() as db:
+        db.execute("DELETE FROM game_teams WHERE game_id=?", [game_id])
+        for pid in player_ids:
+            player = db.execute("SELECT * FROM players WHERE id=?", [pid]).fetchone()
+            if player:
+                cur = db.execute(
+                    "INSERT INTO game_teams (game_id, name) VALUES (?,?)",
+                    [game_id, player["name"]])
+                db.execute(
+                    "INSERT INTO team_players (team_id, player_id) VALUES (?,?)",
+                    [cur.lastrowid, pid])
         db.commit()
 
 
