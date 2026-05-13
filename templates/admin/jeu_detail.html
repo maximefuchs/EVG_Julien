@@ -22,10 +22,6 @@
       {% elif game.type == 'bonus' %}Jeu bonus
       {% else %}Mini jeu{% endif %}
     </span>
-    <span class="badge
-      {% if game.day == 'samedi' %}bg-secondary{% else %}bg-info text-dark{% endif %} me-2">
-      {{ game.day|capitalize }}
-    </span>
     <span class="badge badge-{{ game.status }}">
       {% if game.status == 'en_attente' %}En attente
       {% elif game.status == 'en_cours' %}En cours

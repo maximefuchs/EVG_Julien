@@ -80,7 +80,7 @@
         {% for game in en_cours %}
         <a href="{{ url_for('admin_jeu_detail', game_id=game.id) }}"
            class="btn btn-sm btn-outline-warning mb-2 me-2">
-          🎮 {{ game.name }} ({{ game.day }})
+          🎮 {{ game.name }}
         </a>
         {% endfor %}
         <hr>
@@ -93,13 +93,7 @@
             <input type="text" name="name" class="form-control form-control-sm"
                    placeholder="Nom du jeu" required>
           </div>
-          <div class="col-6">
-            <select name="day" class="form-select form-select-sm" required>
-              <option value="samedi">Samedi</option>
-              <option value="dimanche">Dimanche</option>
-            </select>
-          </div>
-          <div class="col-6">
+          <div class="col-12">
             <select name="type" class="form-select form-select-sm" required>
               <option value="mini_jeu">Mini jeu en équipes</option>
               <option value="mini_jeu_ind">Mini jeu individuel</option>
@@ -125,7 +119,6 @@
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span>{{ game.name }}</span>
-        <span class="badge bg-secondary">{{ game.day }}</span>
       </div>
       <div class="card-body p-0">
         <table class="table table-sm mb-0">

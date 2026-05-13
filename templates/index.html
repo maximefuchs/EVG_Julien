@@ -26,7 +26,6 @@
               {% for game in finished_games %}
               <th class="text-center lb-game-col" data-game-id="{{ game.id }}">
                 {{ game.name }}
-                <div class="lb-day-label">{{ 'Sam.' if game.day == 'samedi' else 'Dim.' }}</div>
               </th>
               {% endfor %}
             </tr>

@@ -248,21 +248,18 @@ def admin_comptes():
 @login_required
 def admin_jeux():
     games = db.get_all_games()
-    samedi   = [g for g in games if g["day"] == "samedi"]
-    dimanche = [g for g in games if g["day"] == "dimanche"]
-    return render_template("admin/jeux.html", samedi=samedi, dimanche=dimanche)
+    return render_template("admin/jeux.html", games=games)
 
 
 @app.route("/admin/jeux/nouveau", methods=["POST"])
 @login_required
 def admin_jeux_nouveau():
     name      = request.form.get("name", "").strip()
-    day       = request.form.get("day")
     game_type = request.form.get("type")
-    if not name or day not in ("samedi", "dimanche") or game_type not in ("mini_jeu", "karting", "mini_jeu_ind", "bonus"):
+    if not name or game_type not in ("mini_jeu", "karting", "mini_jeu_ind", "bonus"):
         flash("Données invalides.", "danger")
         return redirect(url_for("admin_jeux"))
-    game_id = db.create_game(name, day, game_type)
+    game_id = db.create_game(name, game_type)
     flash(f"Jeu « {name} » créé.", "success")
     return redirect(url_for("admin_jeu_detail", game_id=game_id))
 

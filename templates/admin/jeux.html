@@ -38,20 +38,10 @@
 </div>
 {% endmacro %}
 
-<!-- Samedi -->
-<h5 class="text-muted mb-3">Samedi</h5>
-{% if samedi %}
-  {% for game in samedi %}{{ game_card(game) }}{% endfor %}
+{% if games %}
+  {% for game in games %}{{ game_card(game) }}{% endfor %}
 {% else %}
-  <p class="text-muted fst-italic mb-4">Aucun jeu pour le samedi.</p>
-{% endif %}
-
-<!-- Dimanche -->
-<h5 class="text-muted mb-3 mt-4">Dimanche</h5>
-{% if dimanche %}
-  {% for game in dimanche %}{{ game_card(game) }}{% endfor %}
-{% else %}
-  <p class="text-muted fst-italic">Aucun jeu pour le dimanche.</p>
+  <p class="text-muted fst-italic">Aucun jeu créé pour le moment.</p>
 {% endif %}
 
 <!-- Modal nouveau jeu -->
@@ -68,13 +58,6 @@
             <label class="form-label">Nom du jeu</label>
             <input type="text" name="name" class="form-control" required
                    placeholder="Ex : Beer pong, Course en sac…">
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Jour</label>
-            <select name="day" class="form-select" required>
-              <option value="samedi">Samedi</option>
-              <option value="dimanche">Dimanche</option>
-            </select>
           </div>
           <div class="mb-3">
             <label class="form-label">Type</label>

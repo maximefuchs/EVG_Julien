@@ -21,7 +21,6 @@
         <thead>
           <tr>
             <th>Jeu</th>
-            <th>Jour</th>
             <th>Équipe</th>
             <th class="text-center">Place</th>
             <th class="text-center">Points</th>
@@ -31,7 +30,6 @@
           {% for b in breakdown %}
           <tr>
             <td>{{ b.game_name }}</td>
-            <td>{{ b.day|capitalize }}</td>
             <td>{{ b.team_name }}</td>
             <td class="text-center">{{ b.placement }}e</td>
             <td class="text-center">
