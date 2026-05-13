@@ -149,6 +149,7 @@ a:hover { color: #ffd966; text-decoration: none; }
 .badge-en_attente { background-color: #555; }
 .badge-en_cours   { background-color: #2980b9; }
 .badge-termine    { background-color: #27ae60; }
+.bg-bonus         { background-color: #8e44ad; }
 
 /* ---- Admin sidebar / layout ---- */
 .admin-sidebar {

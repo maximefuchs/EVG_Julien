@@ -42,6 +42,10 @@
            href="{{ url_for('admin_joueurs') }}">
           <i>👤</i> Joueurs
         </a>
+        <a class="nav-link {% if request.endpoint == 'admin_presets' %}active{% endif %}"
+           href="{{ url_for('admin_presets') }}">
+          <i>📋</i> Préréglages
+        </a>
         <a class="nav-link {% if request.endpoint == 'admin_comptes' %}active{% endif %}"
            href="{{ url_for('admin_comptes') }}">
           <i>🔑</i> Comptes admin

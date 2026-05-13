@@ -46,6 +46,16 @@ def bootstrap():
 bootstrap()
 
 # ---------------------------------------------------------------------------
+# Presets helper
+# ---------------------------------------------------------------------------
+
+def load_presets():
+    """Load player and team-distribution presets from presets.json."""
+    path = os.path.join(os.path.dirname(__file__), "presets.json")
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+# ---------------------------------------------------------------------------
 # Auth helpers
 # ---------------------------------------------------------------------------
 
@@ -248,21 +258,18 @@ def admin_comptes():
 @login_required
 def admin_jeux():
     games = db.get_all_games()
-    samedi   = [g for g in games if g["day"] == "samedi"]
-    dimanche = [g for g in games if g["day"] == "dimanche"]
-    return render_template("admin/jeux.html", samedi=samedi, dimanche=dimanche)
+    return render_template("admin/jeux.html", games=games)
 
 
 @app.route("/admin/jeux/nouveau", methods=["POST"])
 @login_required
 def admin_jeux_nouveau():
     name      = request.form.get("name", "").strip()
-    day       = request.form.get("day")
     game_type = request.form.get("type")
-    if not name or day not in ("samedi", "dimanche") or game_type not in ("mini_jeu", "karting", "mini_jeu_ind"):
+    if not name or game_type not in ("mini_jeu", "karting", "mini_jeu_ind", "bonus"):
         flash("Données invalides.", "danger")
         return redirect(url_for("admin_jeux"))
-    game_id = db.create_game(name, day, game_type)
+    game_id = db.create_game(name, game_type)
     flash(f"Jeu « {name} » créé.", "success")
     return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
@@ -281,7 +288,11 @@ def admin_jeu_detail(game_id):
     teams   = db.get_teams_for_game(game_id)
     players = db.get_all_players()
     free_players = db.get_players_not_in_game(game_id)
-    score_cfg = db.get_score_config(game["type"])
+    if game["type"] == "bonus":
+        n = len(teams)
+        score_cfg = [{"placement": k, "points": n + 1 - 2 * k} for k in range(1, n + 1)]
+    else:
+        score_cfg = db.get_score_config(game["type"])
     return render_template("admin/jeu_detail.html",
                            game=game, teams=teams,
                            players=players, free_players=free_players,
@@ -348,6 +359,31 @@ def admin_jeu_equipes(game_id):
     return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
 
+@app.route("/admin/jeux/<int:game_id>/participants", methods=["POST"])
+@login_required
+def admin_jeu_participants(game_id):
+    game = db.get_game(game_id)
+    if not game or game["type"] != "bonus":
+        flash("Jeu introuvable ou type incorrect.", "danger")
+        return redirect(url_for("admin_jeux"))
+    if game["status"] == "termine":
+        flash("Ce jeu est terminé, les participants ne peuvent plus être modifiés.", "warning")
+        return redirect(url_for("admin_jeu_detail", game_id=game_id))
+
+    raw_ids = request.form.getlist("player_ids[]")
+    player_ids = [int(pid) for pid in raw_ids if pid.isdigit()]
+
+    if len(player_ids) < 2:
+        flash("Sélectionnez au moins 2 participants.", "warning")
+        return redirect(url_for("admin_jeu_detail", game_id=game_id))
+
+    db.setup_bonus_game(game_id, player_ids)
+    if game["status"] == "en_attente":
+        db.update_game_status(game_id, "en_cours")
+    flash("Participants sauvegardés.", "success")
+    return redirect(url_for("admin_jeu_detail", game_id=game_id))
+
+
 @app.route("/admin/jeux/<int:game_id>/resultats", methods=["POST"])
 @login_required
 def admin_jeu_resultats(game_id):
@@ -385,7 +421,11 @@ def admin_jeu_resultats(game_id):
             team["points_override"] = overrides.get(team["id"], team.get("points_override"))
             team["did_not_participate"] = 1 if team["id"] in dnp_team_ids else 0
         flash(error, "danger")
-        score_cfg = db.get_score_config(game["type"])
+        if game["type"] == "bonus":
+            n = len(teams)
+            score_cfg = [{"placement": k, "points": n + 1 - 2 * k} for k in range(1, n + 1)]
+        else:
+            score_cfg = db.get_score_config(game["type"])
         players = db.get_all_players()
         free_players = db.get_players_not_in_game(game_id)
         return render_template("admin/jeu_detail.html",
@@ -411,6 +451,22 @@ def admin_jeu_statut(game_id):
         if status == "en_cours" and game and game["type"] in ("mini_jeu_ind", "karting"):
             db.setup_individual_game(game_id)
         flash("Statut mis à jour.", "success")
+    return redirect(url_for("admin_jeu_detail", game_id=game_id))
+
+
+@app.route("/admin/jeux/<int:game_id>/renommer", methods=["POST"])
+@login_required
+def admin_jeu_renommer(game_id):
+    game = db.get_game(game_id)
+    if not game:
+        flash("Jeu introuvable.", "danger")
+        return redirect(url_for("admin_jeux"))
+    new_name = request.form.get("name", "").strip()
+    if not new_name:
+        flash("Le nom ne peut pas être vide.", "warning")
+        return redirect(url_for("admin_jeu_detail", game_id=game_id))
+    db.rename_game(game_id, new_name)
+    flash(f"Jeu renommé en « {new_name} ».", "success")
     return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
 
@@ -513,6 +569,83 @@ def admin_db_import():
         flash("Base de données restaurée avec succès.", "success")
         return redirect(url_for("admin_dashboard"))
     return render_template("admin/db_import.html")
+
+
+# ---------------------------------------------------------------------------
+# Admin – Préréglages
+# ---------------------------------------------------------------------------
+
+@app.route("/admin/presets")
+@login_required
+def admin_presets():
+    presets = load_presets()
+    existing_names = {p["name"] for p in db.get_all_players()}
+    missing_players = [name for name in presets["players"] if name not in existing_names]
+    return render_template("admin/presets.html",
+                           presets=presets,
+                           existing_names=existing_names,
+                           missing_players=missing_players)
+
+
+@app.route("/admin/presets/joueurs", methods=["POST"])
+@login_required
+def admin_presets_joueurs():
+    presets = load_presets()
+    existing_names = {p["name"] for p in db.get_all_players()}
+    added = 0
+    for name in presets["players"]:
+        if name not in existing_names:
+            db.add_player(name)
+            all_players = db.get_all_players()
+            new_player = next((p for p in all_players if p["name"] == name), None)
+            if new_player:
+                db.mark_new_player_dnp_in_finished_games(new_player["id"])
+            added += 1
+    if added:
+        flash(f"{added} joueur(s) ajouté(s).", "success")
+    else:
+        flash("Tous les joueurs prédéfinis sont déjà présents.", "info")
+    return redirect(url_for("admin_presets"))
+
+
+@app.route("/admin/presets/equipes", methods=["POST"])
+@login_required
+def admin_presets_equipes():
+    presets = load_presets()
+    game_name = request.form.get("game_name", "").strip()
+    try:
+        dist_idx = int(request.form.get("distribution_index", ""))
+        distribution = presets["distributions"][dist_idx]
+    except (ValueError, IndexError):
+        flash("Répartition invalide.", "danger")
+        return redirect(url_for("admin_presets"))
+
+    if not game_name:
+        flash("Le nom du jeu est requis.", "warning")
+        return redirect(url_for("admin_presets"))
+
+    player_map = {p["name"]: p["id"] for p in db.get_all_players()}
+    teams_data = []
+    missing = []
+    for team in distribution["teams"]:
+        player_ids = []
+        for pname in team["players"]:
+            pid = player_map.get(pname)
+            if pid is None:
+                missing.append(pname)
+            else:
+                player_ids.append(pid)
+        teams_data.append({"name": team["name"], "player_ids": player_ids})
+
+    if missing:
+        flash(f"Joueurs introuvables : {', '.join(missing)}. Importez d'abord les joueurs prédéfinis.", "danger")
+        return redirect(url_for("admin_presets"))
+
+    game_id = db.create_game(game_name, "mini_jeu")
+    db.save_teams(game_id, teams_data)
+    db.update_game_status(game_id, "en_cours")
+    flash(f"Jeu « {game_name} » créé avec la {distribution['label']}.", "success")
+    return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
 
 # ---------------------------------------------------------------------------

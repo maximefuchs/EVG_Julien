@@ -3,7 +3,8 @@
 
 {% block content %}
 {# Variables used in both sections — set once here so they're always defined #}
-{% set is_individual  = game.type in ('karting', 'mini_jeu_ind') %}
+{% set is_individual  = game.type in ('karting', 'mini_jeu_ind', 'bonus') %}
+{% set is_bonus       = game.type == 'bonus' %}
 {% set display_teams  = form_teams if form_teams is defined else teams %}
 
 <!-- Header -->
@@ -14,14 +15,12 @@
     <span class="badge
       {% if game.type == 'karting' %}bg-warning text-dark
       {% elif game.type == 'mini_jeu_ind' %}bg-success
+      {% elif game.type == 'bonus' %}bg-bonus
       {% else %}bg-primary{% endif %} me-2">
       {% if game.type == 'karting' %}Karting
       {% elif game.type == 'mini_jeu_ind' %}Mini jeu individuel
+      {% elif game.type == 'bonus' %}Jeu bonus
       {% else %}Mini jeu{% endif %}
-    </span>
-    <span class="badge
-      {% if game.day == 'samedi' %}bg-secondary{% else %}bg-info text-dark{% endif %} me-2">
-      {{ game.day|capitalize }}
     </span>
     <span class="badge badge-{{ game.status }}">
       {% if game.status == 'en_attente' %}En attente
@@ -32,9 +31,13 @@
 
   <!-- Status + delete actions -->
   <div class="d-flex gap-2 flex-wrap">
+    <button class="btn btn-sm btn-outline-secondary"
+            data-bs-toggle="modal" data-bs-target="#modalRenommer">
+      ✏️ Renommer
+    </button>
     {% if game.status != 'termine' %}
     <form method="POST" action="{{ url_for('admin_jeu_statut', game_id=game.id) }}">
-      {% if game.status == 'en_attente' %}
+      {% if game.status == 'en_attente' and not is_bonus %}
         <input type="hidden" name="status" value="en_cours">
         <button type="submit" class="btn btn-sm btn-outline-primary">▶ Démarrer</button>
       {% endif %}
@@ -157,9 +160,46 @@
 </div>
 {% endif %}
 
+<!-- ===== SECTION 1b : Participants (bonus games only, not finished) ===== -->
+{% if is_bonus and game.status != 'termine' %}
+<div class="card mb-4">
+  <div class="card-header">Participants</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Sélectionnez les joueurs qui participent à ce jeu bonus (minimum 2).
+      Les points seront répartis en zéro-somme : les gagnants marquent des points positifs,
+      les perdants marquent des points négatifs, et la somme totale reste <strong>0</strong>.
+    </p>
+    <form method="POST" action="{{ url_for('admin_jeu_participants', game_id=game.id) }}">
+      <div class="player-checkbox-list" style="max-height:none;padding:12px;">
+        {% for player in players %}
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox"
+                 name="player_ids[]" value="{{ player.id }}"
+                 id="bp_{{ player.id }}"
+                 {% if teams | selectattr('players') | sum(attribute='players', start=[])
+                             | selectattr('id','eq', player.id) | list %}checked{% endif %}>
+          <label class="form-check-label" for="bp_{{ player.id }}">{{ player.name }}</label>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="submit" class="btn btn-gold mt-3">Sauvegarder les participants</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
 <!-- ===== SECTION 2 : Résultats ===== -->
 
-{% if is_individual and game.status == 'en_attente' %}
+{% if is_bonus and game.status == 'en_attente' %}
+{# Bonus game: participants not yet saved #}
+<div class="card">
+  <div class="card-body text-muted">
+    Sélectionnez d'abord les participants ci-dessus pour pouvoir enregistrer les résultats.
+  </div>
+</div>
+
+{% elif is_individual and not is_bonus and game.status == 'en_attente' %}
 {# Individual game not started yet — nothing to show beyond the Start button #}
 <div class="card">
   <div class="card-body text-muted">
@@ -214,14 +254,14 @@
               {% if team.did_not_participate %}
                 –
               {% elif team.points_override is not none %}
-                <span class="points-badge">+{{ team.points_override }}</span>
+                <span class="points-badge">{% if team.points_override > 0 %}+{% endif %}{{ team.points_override }}</span>
                 {% set def_pts = score_cfg | selectattr('placement','eq', team.placement) | list %}
                 {% if def_pts %}
                   <span class="text-muted small ms-1">(défaut : {{ def_pts[0].points }})</span>
                 {% endif %}
               {% else %}
                 {% set pts = score_cfg | selectattr('placement','eq', team.placement) | list %}
-                {% if pts %}<span class="points-badge">+{{ pts[0].points }}</span>{% else %}–{% endif %}
+                {% if pts %}<span class="points-badge">{% if pts[0].points > 0 %}+{% endif %}{{ pts[0].points }}</span>{% else %}–{% endif %}
               {% endif %}
             </td>
           </tr>
@@ -248,11 +288,17 @@
     </script>
 
     <p class="text-muted small mb-3">
-      Entrez le classement de chaque
-      {% if is_individual %}joueur{% else %}équipe{% endif %}
-      (1 = premier, 2 = deuxième…).
-      Cochez <strong>N'a pas participé</strong> pour exclure un joueur/équipe.
-      Les points sont pré-remplis selon la configuration, mais vous pouvez les ajuster.
+      {% if is_bonus %}
+        Entrez le classement de chaque joueur (1 = premier, 2 = deuxième…).
+        Les points sont calculés en <strong>zéro-somme</strong> : les gagnants reçoivent des points positifs,
+        les perdants des points négatifs. Vous pouvez ajuster manuellement avec les boutons +/−.
+      {% else %}
+        Entrez le classement de chaque
+        {% if is_individual %}joueur{% else %}équipe{% endif %}
+        (1 = premier, 2 = deuxième…).
+        Cochez <strong>N'a pas participé</strong> pour exclure un joueur/équipe.
+        Les points sont pré-remplis selon la configuration, mais vous pouvez les ajuster.
+      {% endif %}
     </p>
 
     <form method="POST" action="{{ url_for('admin_jeu_resultats', game_id=game.id) }}">
@@ -263,8 +309,10 @@
               <th>{% if is_individual %}Joueur{% else %}Équipe{% endif %}</th>
               {% if not is_individual %}<th>Membres</th>{% endif %}
               <th class="text-center" style="width:110px;">Place</th>
-              <th class="text-center" style="width:160px;">Points</th>
-              {% if is_individual %}<th class="text-center" style="width:150px;">N'a pas participé</th>{% endif %}
+              <th class="text-center" style="width:160px;">
+                Points{% if is_bonus %} <span class="text-muted small">(somme = 0)</span>{% endif %}
+              </th>
+              {% if is_individual and not is_bonus %}<th class="text-center" style="width:150px;">N'a pas participé</th>{% endif %}
             </tr>
           </thead>
           <tbody>
@@ -311,7 +359,7 @@
                   <span class="default-pts-hint" data-default="{{ default_pts }}" style="display:none;"></span>
                 </div>
               </td>
-              {% if is_individual %}
+              {% if is_individual and not is_bonus %}
               <td class="text-center">
                 <div class="form-check d-flex justify-content-center">
                   <input class="form-check-input dnp-checkbox" type="checkbox"
@@ -443,5 +491,26 @@
   </div>
 </div>
 {% endif %}
+
+<!-- Rename modal -->
+<div class="modal fade" id="modalRenommer" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content" style="background:#1a1a2e;color:#e0e0e0;">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Renommer le jeu</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('admin_jeu_renommer', game_id=game.id) }}">
+        <div class="modal-body">
+          <input type="text" name="name" class="form-control"
+                 value="{{ game.name }}" required autofocus>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="submit" class="btn btn-gold btn-sm">Sauvegarder</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 {% endblock %}

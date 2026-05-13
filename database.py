@@ -28,8 +28,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS games (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 name       TEXT NOT NULL,
-                day        TEXT NOT NULL CHECK(day IN ('samedi','dimanche')),
-                type       TEXT NOT NULL CHECK(type IN ('mini_jeu','karting','mini_jeu_ind')),
+                type       TEXT NOT NULL CHECK(type IN ('mini_jeu','karting','mini_jeu_ind','bonus')),
                 status     TEXT NOT NULL DEFAULT 'en_attente'
                                CHECK(status IN ('en_attente','en_cours','termine')),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -65,6 +64,31 @@ def init_db():
             db.execute("ALTER TABLE game_teams ADD COLUMN points_override INTEGER")
         if "did_not_participate" not in cols:
             db.execute("ALTER TABLE game_teams ADD COLUMN did_not_participate INTEGER NOT NULL DEFAULT 0")
+
+        # Migration: ensure games table has no 'day' column and supports 'bonus' type.
+        # Handles existing databases created before these schema changes.
+        games_cols = [r[1] for r in db.execute("PRAGMA table_info(games)").fetchall()]
+        schema_row = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='games'"
+        ).fetchone()
+        if "day" in games_cols or (schema_row and "'bonus'" not in schema_row[0]):
+            db.executescript("""
+                PRAGMA foreign_keys = OFF;
+                CREATE TABLE games_new (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name       TEXT NOT NULL,
+                    type       TEXT NOT NULL CHECK(type IN ('mini_jeu','karting','mini_jeu_ind','bonus')),
+                    status     TEXT NOT NULL DEFAULT 'en_attente'
+                                   CHECK(status IN ('en_attente','en_cours','termine')),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                INSERT INTO games_new (id, name, type, status, created_at)
+                    SELECT id, name, type, status, created_at FROM games;
+                DROP TABLE games;
+                ALTER TABLE games_new RENAME TO games;
+                PRAGMA foreign_keys = ON;
+            """)
+            db.commit()
 
         # Default score config (only inserted if table is empty)
         existing = db.execute("SELECT COUNT(*) FROM score_config").fetchone()[0]
@@ -129,11 +153,11 @@ def get_leaderboard():
 
 
 def get_finished_games():
-    """Return all finished games ordered by day then creation date."""
+    """Return all finished games ordered by creation date."""
     with get_db() as db:
         return [dict(r) for r in db.execute(
-            "SELECT id, name, day, type FROM games "
-            "WHERE status = 'termine' ORDER BY day, created_at"
+            "SELECT id, name, type FROM games "
+            "WHERE status = 'termine' ORDER BY created_at"
         ).fetchall()]
 
 
@@ -172,7 +196,6 @@ def get_player_game_breakdown(player_id):
         rows = db.execute("""
             SELECT
                 g.name  AS game_name,
-                g.day,
                 g.type,
                 gt.name AS team_name,
                 gt.placement,
@@ -259,14 +282,14 @@ def count_admins():
 def get_all_games():
     with get_db() as db:
         return [dict(r) for r in db.execute(
-            "SELECT * FROM games ORDER BY day, created_at").fetchall()]
+            "SELECT * FROM games ORDER BY created_at").fetchall()]
 
 
 def get_finished_games_with_results():
     """Return finished games, each with a sorted list of result rows (placement, name, players)."""
     with get_db() as db:
         games = [dict(r) for r in db.execute(
-            "SELECT * FROM games WHERE status='termine' ORDER BY day, created_at"
+            "SELECT * FROM games WHERE status='termine' ORDER BY created_at"
         ).fetchall()]
         for game in games:
             rows = db.execute("""
@@ -297,11 +320,11 @@ def get_game(game_id):
         return dict(row) if row else None
 
 
-def create_game(name, day, game_type):
+def create_game(name, game_type):
     with get_db() as db:
         cur = db.execute(
-            "INSERT INTO games (name, day, type) VALUES (?,?,?)",
-            [name.strip(), day, game_type])
+            "INSERT INTO games (name, type) VALUES (?,?)",
+            [name.strip(), game_type])
         db.commit()
         return cur.lastrowid
 
@@ -309,6 +332,12 @@ def create_game(name, day, game_type):
 def update_game_status(game_id, status):
     with get_db() as db:
         db.execute("UPDATE games SET status=? WHERE id=?", [status, game_id])
+        db.commit()
+
+
+def rename_game(game_id, new_name):
+    with get_db() as db:
+        db.execute("UPDATE games SET name=? WHERE id=?", [new_name.strip(), game_id])
         db.commit()
 
 
@@ -420,6 +449,25 @@ def setup_individual_game(game_id):
                 db.execute(
                     "INSERT INTO team_players (team_id, player_id) VALUES (?,?)",
                     [cur.lastrowid, p["id"]])
+        db.commit()
+
+
+def setup_bonus_game(game_id, player_ids):
+    """
+    For bonus games: create one game_team per selected player.
+    Replaces any previous participant list.
+    """
+    with get_db() as db:
+        db.execute("DELETE FROM game_teams WHERE game_id=?", [game_id])
+        for pid in player_ids:
+            player = db.execute("SELECT * FROM players WHERE id=?", [pid]).fetchone()
+            if player:
+                cur = db.execute(
+                    "INSERT INTO game_teams (game_id, name) VALUES (?,?)",
+                    [game_id, player["name"]])
+                db.execute(
+                    "INSERT INTO team_players (team_id, player_id) VALUES (?,?)",
+                    [cur.lastrowid, pid])
         db.commit()
 
 

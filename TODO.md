@@ -3,4 +3,5 @@ SECURITY
 UX
 
 FEATURES
-- add bonus game type (indiv + sum of points should be 0)
+- random generator for oject weight or height
+- option to save the current score on a game (for culture G + multi game)

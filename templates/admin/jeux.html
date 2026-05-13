@@ -17,9 +17,11 @@
       <span class="badge ms-2
         {% if game.type == 'karting' %}bg-warning text-dark
         {% elif game.type == 'mini_jeu_ind' %}bg-success
+        {% elif game.type == 'bonus' %}bg-bonus
         {% else %}bg-primary{% endif %}">
         {% if game.type == 'karting' %}Karting
         {% elif game.type == 'mini_jeu_ind' %}Mini jeu individuel
+        {% elif game.type == 'bonus' %}Jeu bonus
         {% else %}Mini jeu{% endif %}
       </span>
     </div>
@@ -36,20 +38,10 @@
 </div>
 {% endmacro %}
 
-<!-- Samedi -->
-<h5 class="text-muted mb-3">Samedi</h5>
-{% if samedi %}
-  {% for game in samedi %}{{ game_card(game) }}{% endfor %}
+{% if games %}
+  {% for game in games %}{{ game_card(game) }}{% endfor %}
 {% else %}
-  <p class="text-muted fst-italic mb-4">Aucun jeu pour le samedi.</p>
-{% endif %}
-
-<!-- Dimanche -->
-<h5 class="text-muted mb-3 mt-4">Dimanche</h5>
-{% if dimanche %}
-  {% for game in dimanche %}{{ game_card(game) }}{% endfor %}
-{% else %}
-  <p class="text-muted fst-italic">Aucun jeu pour le dimanche.</p>
+  <p class="text-muted fst-italic">Aucun jeu créé pour le moment.</p>
 {% endif %}
 
 <!-- Modal nouveau jeu -->
@@ -68,18 +60,12 @@
                    placeholder="Ex : Beer pong, Course en sac…">
           </div>
           <div class="mb-3">
-            <label class="form-label">Jour</label>
-            <select name="day" class="form-select" required>
-              <option value="samedi">Samedi</option>
-              <option value="dimanche">Dimanche</option>
-            </select>
-          </div>
-          <div class="mb-3">
             <label class="form-label">Type</label>
             <select name="type" class="form-select" required>
               <option value="mini_jeu">Mini jeu en équipes</option>
               <option value="mini_jeu_ind">Mini jeu individuel</option>
               <option value="karting">Karting</option>
+              <option value="bonus">Jeu bonus (zéro-somme)</option>
             </select>
           </div>
         </div>

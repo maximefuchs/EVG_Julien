@@ -1,0 +1,59 @@
+{
+  "players": [
+    "Alexandre",
+    "Antoine",
+    "Auxence",
+    "Julien",
+    "Corentin H",
+    "Corentin DK",
+    "Emile",
+    "Florian",
+    "Marc",
+    "Maxime F",
+    "Maxime G",
+    "Nathan",
+    "Pierre",
+    "Thibaut",
+    "Timothé"
+  ],
+  "distributions": [
+    {
+      "label": "Répartition A — 5 équipes de 3",
+      "teams": [
+        { "name": "Équipe 1", "players": ["Nathan",      "Corentin H",  "Marc"      ] },
+        { "name": "Équipe 2", "players": ["Emile",       "Timothé",     "Maxime G"  ] },
+        { "name": "Équipe 3", "players": ["Alexandre",   "Auxence",     "Corentin DK"] },
+        { "name": "Équipe 4", "players": ["Florian",     "Thibaut",     "Antoine"   ] },
+        { "name": "Équipe 5", "players": ["Pierre",      "Maxime F",    "Julien"    ] }
+      ]
+    },
+    {
+      "label": "Répartition B — 5 équipes de 3",
+      "teams": [
+        { "name": "Équipe 1", "players": ["Corentin DK", "Maxime F",    "Nathan"    ] },
+        { "name": "Équipe 2", "players": ["Antoine",     "Corentin H",  "Emile"     ] },
+        { "name": "Équipe 3", "players": ["Pierre",      "Marc",        "Thibaut"   ] },
+        { "name": "Équipe 4", "players": ["Alexandre",   "Julien",      "Maxime G"  ] },
+        { "name": "Équipe 5", "players": ["Auxence",     "Florian",     "Timothé"   ] }
+      ]
+    },
+    {
+      "label": "Répartition C — 5 équipes de 3",
+      "teams": [
+        { "name": "Équipe 1", "players": ["Florian",     "Marc",        "Maxime G"  ] },
+        { "name": "Équipe 2", "players": ["Thibaut",     "Corentin DK", "Julien"    ] },
+        { "name": "Équipe 3", "players": ["Alexandre",   "Pierre",      "Corentin H"] },
+        { "name": "Équipe 4", "players": ["Auxence",     "Nathan",      "Emile"     ] },
+        { "name": "Équipe 5", "players": ["Antoine",     "Maxime F",    "Timothé"   ] }
+      ]
+    },
+    {
+      "label": "Répartition D — 3 équipes de 5",
+      "teams": [
+        { "name": "Équipe 1", "players": ["Alexandre",   "Antoine",     "Auxence",    "Julien",  "Corentin H"  ] },
+        { "name": "Équipe 2", "players": ["Corentin DK", "Emile",       "Florian",    "Marc",    "Maxime F"    ] },
+        { "name": "Équipe 3", "players": ["Maxime G",    "Nathan",      "Pierre",     "Thibaut", "Timothé"     ] }
+      ]
+    }
+  ]
+}
