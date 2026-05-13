@@ -46,6 +46,16 @@ def bootstrap():
 bootstrap()
 
 # ---------------------------------------------------------------------------
+# Presets helper
+# ---------------------------------------------------------------------------
+
+def load_presets():
+    """Load player and team-distribution presets from presets.json."""
+    path = os.path.join(os.path.dirname(__file__), "presets.json")
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+# ---------------------------------------------------------------------------
 # Auth helpers
 # ---------------------------------------------------------------------------
 
@@ -543,6 +553,83 @@ def admin_db_import():
         flash("Base de données restaurée avec succès.", "success")
         return redirect(url_for("admin_dashboard"))
     return render_template("admin/db_import.html")
+
+
+# ---------------------------------------------------------------------------
+# Admin – Préréglages
+# ---------------------------------------------------------------------------
+
+@app.route("/admin/presets")
+@login_required
+def admin_presets():
+    presets = load_presets()
+    existing_names = {p["name"] for p in db.get_all_players()}
+    missing_players = [name for name in presets["players"] if name not in existing_names]
+    return render_template("admin/presets.html",
+                           presets=presets,
+                           existing_names=existing_names,
+                           missing_players=missing_players)
+
+
+@app.route("/admin/presets/joueurs", methods=["POST"])
+@login_required
+def admin_presets_joueurs():
+    presets = load_presets()
+    existing_names = {p["name"] for p in db.get_all_players()}
+    added = 0
+    for name in presets["players"]:
+        if name not in existing_names:
+            db.add_player(name)
+            all_players = db.get_all_players()
+            new_player = next((p for p in all_players if p["name"] == name), None)
+            if new_player:
+                db.mark_new_player_dnp_in_finished_games(new_player["id"])
+            added += 1
+    if added:
+        flash(f"{added} joueur(s) ajouté(s).", "success")
+    else:
+        flash("Tous les joueurs prédéfinis sont déjà présents.", "info")
+    return redirect(url_for("admin_presets"))
+
+
+@app.route("/admin/presets/equipes", methods=["POST"])
+@login_required
+def admin_presets_equipes():
+    presets = load_presets()
+    game_name = request.form.get("game_name", "").strip()
+    try:
+        dist_idx = int(request.form.get("distribution_index", ""))
+        distribution = presets["distributions"][dist_idx]
+    except (ValueError, IndexError):
+        flash("Répartition invalide.", "danger")
+        return redirect(url_for("admin_presets"))
+
+    if not game_name:
+        flash("Le nom du jeu est requis.", "warning")
+        return redirect(url_for("admin_presets"))
+
+    player_map = {p["name"]: p["id"] for p in db.get_all_players()}
+    teams_data = []
+    missing = []
+    for team in distribution["teams"]:
+        player_ids = []
+        for pname in team["players"]:
+            pid = player_map.get(pname)
+            if pid is None:
+                missing.append(pname)
+            else:
+                player_ids.append(pid)
+        teams_data.append({"name": team["name"], "player_ids": player_ids})
+
+    if missing:
+        flash(f"Joueurs introuvables : {', '.join(missing)}. Importez d'abord les joueurs prédéfinis.", "danger")
+        return redirect(url_for("admin_presets"))
+
+    game_id = db.create_game(game_name, "mini_jeu")
+    db.save_teams(game_id, teams_data)
+    db.update_game_status(game_id, "en_cours")
+    flash(f"Jeu « {game_name} » créé avec la {distribution['label']}.", "success")
+    return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
 
 # ---------------------------------------------------------------------------
