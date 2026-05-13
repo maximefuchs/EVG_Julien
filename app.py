@@ -454,6 +454,22 @@ def admin_jeu_statut(game_id):
     return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
 
+@app.route("/admin/jeux/<int:game_id>/renommer", methods=["POST"])
+@login_required
+def admin_jeu_renommer(game_id):
+    game = db.get_game(game_id)
+    if not game:
+        flash("Jeu introuvable.", "danger")
+        return redirect(url_for("admin_jeux"))
+    new_name = request.form.get("name", "").strip()
+    if not new_name:
+        flash("Le nom ne peut pas être vide.", "warning")
+        return redirect(url_for("admin_jeu_detail", game_id=game_id))
+    db.rename_game(game_id, new_name)
+    flash(f"Jeu renommé en « {new_name} ».", "success")
+    return redirect(url_for("admin_jeu_detail", game_id=game_id))
+
+
 @app.route("/admin/jeux/<int:game_id>/supprimer", methods=["POST"])
 @login_required
 def admin_jeu_supprimer(game_id):

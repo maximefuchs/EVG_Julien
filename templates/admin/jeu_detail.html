@@ -31,6 +31,10 @@
 
   <!-- Status + delete actions -->
   <div class="d-flex gap-2 flex-wrap">
+    <button class="btn btn-sm btn-outline-secondary"
+            data-bs-toggle="modal" data-bs-target="#modalRenommer">
+      ✏️ Renommer
+    </button>
     {% if game.status != 'termine' %}
     <form method="POST" action="{{ url_for('admin_jeu_statut', game_id=game.id) }}">
       {% if game.status == 'en_attente' and not is_bonus %}
@@ -487,5 +491,26 @@
   </div>
 </div>
 {% endif %}
+
+<!-- Rename modal -->
+<div class="modal fade" id="modalRenommer" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content" style="background:#1a1a2e;color:#e0e0e0;">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Renommer le jeu</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('admin_jeu_renommer', game_id=game.id) }}">
+        <div class="modal-body">
+          <input type="text" name="name" class="form-control"
+                 value="{{ game.name }}" required autofocus>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="submit" class="btn btn-gold btn-sm">Sauvegarder</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 {% endblock %}

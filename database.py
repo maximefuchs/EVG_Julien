@@ -335,6 +335,12 @@ def update_game_status(game_id, status):
         db.commit()
 
 
+def rename_game(game_id, new_name):
+    with get_db() as db:
+        db.execute("UPDATE games SET name=? WHERE id=?", [new_name.strip(), game_id])
+        db.commit()
+
+
 def delete_game(game_id):
     with get_db() as db:
         db.execute("DELETE FROM games WHERE id=?", [game_id])
