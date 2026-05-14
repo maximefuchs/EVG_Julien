@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Défi Mesures – EVG{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:680px;">
+
+  <!-- En-tête -->
+  <div class="text-center mb-4">
+    <h1 class="mesures-title">📏 Défi Mesures</h1>
+    <p class="text-muted small">
+      Génère une mesure aléatoire et trouve un objet qui correspond !
+    </p>
+  </div>
+
+  <!-- Sélecteur de mode -->
+  <div class="d-flex justify-content-center mb-4">
+    <div class="btn-group mesures-mode-group" role="group">
+      <button type="button" class="btn mesures-mode-btn active" data-mode="length">
+        📏 Longueur
+      </button>
+      <button type="button" class="btn mesures-mode-btn" data-mode="weight">
+        ⚖️ Poids
+      </button>
+      <button type="button" class="btn mesures-mode-btn" data-mode="both">
+        🎯 Les deux
+      </button>
+    </div>
+  </div>
+
+  <!-- Paramètres -->
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Paramètres</span>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+              data-bs-toggle="collapse" data-bs-target="#settings-collapse"
+              aria-expanded="false">
+        ⚙️ Afficher / Masquer
+      </button>
+    </div>
+    <div class="collapse" id="settings-collapse">
+      <div class="card-body">
+
+        <!-- Longueur -->
+        <div id="settings-length" class="mesures-settings-group">
+          <p class="text-muted small mb-2 fw-bold">Longueur (cm)</p>
+          <div class="row g-2 align-items-center">
+            <div class="col-auto"><label class="col-form-label col-form-label-sm">Min</label></div>
+            <div class="col-auto">
+              <input type="number" id="len-min" class="form-control form-control-sm mesures-range-input"
+                     value="1" min="1" max="9999" style="width:80px;">
+            </div>
+            <div class="col-auto"><label class="col-form-label col-form-label-sm">Max</label></div>
+            <div class="col-auto">
+              <input type="number" id="len-max" class="form-control form-control-sm mesures-range-input"
+                     value="100" min="1" max="9999" style="width:80px;">
+            </div>
+            <div class="col-auto text-muted small">cm</div>
+          </div>
+        </div>
+
+        <!-- Poids -->
+        <div id="settings-weight" class="mesures-settings-group mt-3" style="display:none;">
+          <p class="text-muted small mb-2 fw-bold">Poids</p>
+          <div class="row g-2 align-items-center flex-wrap">
+            <div class="col-auto">
+              <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-secondary mesures-unit-btn active"
+                        data-unit="g">g</button>
+                <button type="button" class="btn btn-outline-secondary mesures-unit-btn"
+                        data-unit="kg">kg</button>
+              </div>
+            </div>
+            <div class="col-auto"><label class="col-form-label col-form-label-sm">Min</label></div>
+            <div class="col-auto">
+              <input type="number" id="wt-min" class="form-control form-control-sm mesures-range-input"
+                     value="10" min="0" max="99999" step="1" style="width:80px;">
+            </div>
+            <div class="col-auto"><label class="col-form-label col-form-label-sm">Max</label></div>
+            <div class="col-auto">
+              <input type="number" id="wt-max" class="form-control form-control-sm mesures-range-input"
+                     value="2000" min="1" max="99999" step="1" style="width:80px;">
+            </div>
+            <div class="col-auto text-muted small" id="wt-unit-label">g</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Bouton générer -->
+  <div class="text-center mb-4">
+    <button id="btn-generate" class="btn btn-gold mesures-generate-btn">
+      🎲 Générer
+    </button>
+  </div>
+
+  <!-- Résultat -->
+  <div id="result-zone" class="d-flex justify-content-center gap-3 flex-wrap mb-4"
+       style="min-height:120px;"></div>
+
+  <!-- Historique -->
+  <div id="history-section" style="display:none;">
+    <h6 class="text-muted text-center mb-2" style="letter-spacing:1px;text-transform:uppercase;font-size:.75rem;">
+      Historique
+    </h6>
+    <div id="history-list" class="d-flex flex-wrap justify-content-center gap-2"></div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+
+  /* ── État ─────────────────────────────────────────────────────────────── */
+  let mode       = 'length';   // 'length' | 'weight' | 'both'
+  let weightUnit = 'g';        // 'g' | 'kg'
+  const history  = [];         // { label: string }[]  max 8
+
+  /* ── Références DOM ───────────────────────────────────────────────────── */
+  const modeBtns      = document.querySelectorAll('.mesures-mode-btn');
+  const unitBtns      = document.querySelectorAll('.mesures-unit-btn');
+  const btnGenerate   = document.getElementById('btn-generate');
+  const resultZone    = document.getElementById('result-zone');
+  const historySection= document.getElementById('history-section');
+  const historyList   = document.getElementById('history-list');
+  const settingsLen   = document.getElementById('settings-length');
+  const settingsWt    = document.getElementById('settings-weight');
+  const lenMin        = document.getElementById('len-min');
+  const lenMax        = document.getElementById('len-max');
+  const wtMin         = document.getElementById('wt-min');
+  const wtMax         = document.getElementById('wt-max');
+  const wtUnitLabel   = document.getElementById('wt-unit-label');
+
+  /* ── Sélection de mode ────────────────────────────────────────────────── */
+  modeBtns.forEach(btn => {
+    btn.addEventListener('click', function () {
+      modeBtns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      mode = this.dataset.mode;
+      updateSettingsVisibility();
+    });
+  });
+
+  function updateSettingsVisibility() {
+    if (mode === 'length') {
+      settingsLen.style.display = '';
+      settingsWt.style.display  = 'none';
+    } else if (mode === 'weight') {
+      settingsLen.style.display = 'none';
+      settingsWt.style.display  = '';
+    } else { // both
+      settingsLen.style.display = '';
+      settingsWt.style.display  = '';
+    }
+  }
+
+  /* ── Sélection d'unité de poids ───────────────────────────────────────── */
+  unitBtns.forEach(btn => {
+    btn.addEventListener('click', function () {
+      unitBtns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      weightUnit = this.dataset.unit;
+      wtUnitLabel.textContent = weightUnit;
+      // Adjust default range when switching unit
+      if (weightUnit === 'g') {
+        wtMin.step  = '1';
+        if (parseFloat(wtMin.value) < 1) { wtMin.value = '10'; wtMax.value = '2000'; }
+      } else {
+        wtMin.step  = '0.1';
+        if (parseFloat(wtMin.value) > 100) { wtMin.value = '0.1'; wtMax.value = '10'; }
+      }
+    });
+  });
+
+  /* ── Génération ───────────────────────────────────────────────────────── */
+  btnGenerate.addEventListener('click', generate);
+
+  function getInt(min, max) {
+    min = Math.ceil(min); max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  function generateLength() {
+    const mn = parseInt(lenMin.value, 10) || 1;
+    const mx = parseInt(lenMax.value, 10) || 100;
+    const v  = getInt(Math.min(mn, mx), Math.max(mn, mx));
+    return { value: v, label: v + ' cm', display: v, unit: 'cm', icon: '📏' };
+  }
+
+  function generateWeight() {
+    const mn = parseFloat(wtMin.value) || (weightUnit === 'g' ? 10 : 0.1);
+    const mx = parseFloat(wtMax.value) || (weightUnit === 'g' ? 2000 : 10);
+    const lo = Math.min(mn, mx);
+    const hi = Math.max(mn, mx);
+    let v, display, unit;
+    if (weightUnit === 'g') {
+      v = getInt(Math.round(lo), Math.round(hi));
+      display = v;
+      unit = 'g';
+    } else {
+      // 1-decimal kg
+      v = Math.round((Math.random() * (hi - lo) + lo) * 10) / 10;
+      display = v.toFixed(1);
+      unit = 'kg';
+    }
+    return { value: v, label: display + ' ' + unit, display, unit, icon: '⚖️' };
+  }
+
+  function generate() {
+    let cards = [];
+    if (mode === 'length') {
+      cards = [generateLength()];
+    } else if (mode === 'weight') {
+      cards = [generateWeight()];
+    } else {
+      cards = [generateLength(), generateWeight()];
+    }
+
+    renderResult(cards);
+    pushHistory(cards);
+
+    // Animate button
+    btnGenerate.classList.add('mesures-btn-pop');
+    btnGenerate.addEventListener('animationend', () => {
+      btnGenerate.classList.remove('mesures-btn-pop');
+    }, { once: true });
+  }
+
+  /* ── Affichage du résultat ────────────────────────────────────────────── */
+  function renderResult(cards) {
+    resultZone.innerHTML = '';
+    cards.forEach(card => {
+      const div = document.createElement('div');
+      div.className = 'mesures-result-card mesures-result-pop';
+      div.innerHTML =
+        '<div class="mesures-result-icon">' + card.icon + '</div>' +
+        '<div class="mesures-result-number">' + escHtml(String(card.display)) + '</div>' +
+        '<div class="mesures-result-unit">'   + escHtml(card.unit) + '</div>';
+      resultZone.appendChild(div);
+    });
+  }
+
+  /* ── Historique ───────────────────────────────────────────────────────── */
+  function pushHistory(cards) {
+    const label = cards.map(c => c.icon + ' ' + c.label).join('  ·  ');
+    history.unshift({ label });
+    if (history.length > 8) history.pop();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    if (!history.length) { historySection.style.display = 'none'; return; }
+    historySection.style.display = '';
+    historyList.innerHTML = '';
+    history.forEach((entry, i) => {
+      const span = document.createElement('span');
+      span.className = 'mesures-history-item' + (i === 0 ? ' mesures-history-latest' : '');
+      span.textContent = entry.label;
+      historyList.appendChild(span);
+    });
+  }
+
+  /* ── Utilitaires ──────────────────────────────────────────────────────── */
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+})();
+</script>
+{% endblock %}
