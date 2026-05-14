@@ -330,8 +330,7 @@
                         class="form-select form-select-sm text-center d-inline-block placement-input"
                         style="width:80px;"
                         data-team-id="{{ team.id }}"
-                        {% if is_dnp %}disabled{% endif %}
-                        required>
+                        {% if is_dnp %}disabled{% endif %}>
                   <option value="">–</option>
                   {% for i in range(1, teams|length + 1) %}
                   <option value="{{ i }}" {% if team.placement == i %}selected{% endif %}>{{ i }}</option>
@@ -375,9 +374,17 @@
           </tbody>
         </table>
       </div>
-      <button type="submit" class="btn btn-accent">
-        Enregistrer les résultats et terminer le jeu
-      </button>
+      <div class="d-flex gap-2 flex-wrap mt-3">
+        <button type="button" id="btn-auto-rank" class="btn btn-outline-info btn-sm">
+          Classer par score
+        </button>
+        <button type="submit" name="action" value="save" class="btn btn-outline-secondary">
+          Sauvegarder
+        </button>
+        <button type="submit" name="action" value="finish" class="btn btn-accent">
+          Terminer le jeu
+        </button>
+      </div>
     </form>
 
     <script>
@@ -410,12 +417,11 @@
         });
       });
 
-      // Sync points widget when placement SELECT changes
+      // Sync placement options when a select or DNP changes
       function syncPlacementOptions() {
         const allSelects = Array.from(document.querySelectorAll('.placement-input'));
         const activeSelects = allSelects.filter(s => !s.disabled);
         const maxPlacement = activeSelects.length; // effective max = number of participating rows
-        const usedValues = new Set(activeSelects.map(s => s.value).filter(v => v !== ''));
 
         allSelects.forEach(function (sel) {
           if (sel.disabled) return;
@@ -425,8 +431,8 @@
               opt.hidden = false;
             } else {
               const num = parseInt(opt.value, 10);
-              // Hide if beyond current max OR already taken by another select
-              opt.hidden = num > maxPlacement || (usedValues.has(opt.value) && opt.value !== own);
+              // Hide only if beyond current participant count (allow duplicate ranks for ties)
+              opt.hidden = num > maxPlacement;
             }
           });
           // If current value is now out of range, reset it
@@ -445,9 +451,14 @@
           if (!widget) return;
           const placement = parseInt(this.value, 10);
           if (!isNaN(placement)) {
-            const def = defaultPts(placement);
-            widget.querySelector('.points-display').textContent = def;
-            widget.querySelector('.points-override-input').value = def;
+            const hiddenInput = widget.querySelector('.points-override-input');
+            const currentPts = parseInt(hiddenInput.value, 10) || 0;
+            // Only auto-fill score from config if current score is 0 (not manually set)
+            if (currentPts === 0) {
+              const def = defaultPts(placement);
+              widget.querySelector('.points-display').textContent = def;
+              hiddenInput.value = def;
+            }
           }
         });
       });
@@ -480,6 +491,74 @@
           hiddenInput.value = val;
           updateHint(val);
         });
+      });
+
+      // Auto-rank by score: assigns rank 1 to highest score, handles ties
+      function autoRankByScore() {
+        const rows = Array.from(document.querySelectorAll('.result-row'));
+        const teams = [];
+        rows.forEach(function (row) {
+          const teamId = row.dataset.teamId;
+          const widget = row.querySelector('.points-widget');
+          const selectEl = row.querySelector('.placement-input');
+          if (!widget || !selectEl || selectEl.disabled) return;
+          const score = parseInt(widget.querySelector('.points-override-input').value, 10) || 0;
+          teams.push({ score: score, selectEl: selectEl });
+        });
+
+        // Sort descending by score
+        teams.sort(function (a, b) { return b.score - a.score; });
+
+        // Assign standard competition ranks (1, 2, 2, 4 for ties)
+        var rank = 1;
+        for (var i = 0; i < teams.length; i++) {
+          if (i > 0 && teams[i].score !== teams[i - 1].score) {
+            rank = i + 1;
+          }
+          teams[i].selectEl.value = String(rank);
+        }
+
+        syncPlacementOptions();
+      }
+
+      document.getElementById('btn-auto-rank').addEventListener('click', autoRankByScore);
+
+      // Validate ranks before finishing the game
+      document.querySelector('button[name="action"][value="finish"]').addEventListener('click', function (e) {
+        const activeSelects = Array.from(document.querySelectorAll('.placement-input')).filter(s => !s.disabled);
+
+        // 1. All participants must have a rank
+        if (activeSelects.some(s => !s.value)) {
+          e.preventDefault();
+          alert('Veuillez renseigner le classement de tous les participants avant de terminer le jeu.');
+          return;
+        }
+
+        // 2. Rank sequence must be logically valid (standard competition ranking)
+        const ranks = activeSelects.map(s => parseInt(s.value, 10)).sort((a, b) => a - b);
+
+        if (ranks[0] !== 1) {
+          e.preventDefault();
+          alert('Le classement doit commencer à la 1re place.');
+          return;
+        }
+
+        let i = 0;
+        while (i < ranks.length) {
+          const r = ranks[i];
+          let j = i;
+          while (j < ranks.length && ranks[j] === r) j++;
+          const count = j - i;
+          if (j < ranks.length && ranks[j] !== r + count) {
+            e.preventDefault();
+            alert(
+              `Classement invalide : ${count} participant(s) sont à la ${r}e place, ` +
+              `donc la prochaine doit être la ${r + count}e (pas la ${ranks[j]}e).`
+            );
+            return;
+          }
+          i = j;
+        }
       });
     })();
     </script>

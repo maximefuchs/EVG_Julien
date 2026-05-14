@@ -399,11 +399,12 @@ def save_teams(game_id, teams_data):
         db.commit()
 
 
-def save_results(game_id, placements, overrides=None, dnp_team_ids=None):
+def save_results(game_id, placements, overrides=None, dnp_team_ids=None, finish=True):
     """
     placements:    dict {team_id: placement_int}  — only participating teams
     overrides:     dict {team_id: points_int or None}
     dnp_team_ids:  set/list of team_ids that did not participate
+    finish:        if True, set game status to 'termine'; if False, leave as 'en_cours'
     """
     if overrides is None:
         overrides = {}
@@ -414,8 +415,10 @@ def save_results(game_id, placements, overrides=None, dnp_team_ids=None):
         db.execute(
             "UPDATE game_teams SET placement=NULL, points_override=NULL, did_not_participate=0 WHERE game_id=?",
             [game_id])
-        # Save participating teams
-        for team_id, placement in placements.items():
+        # Save all non-DNP teams (with or without a placement)
+        all_team_ids = (set(placements.keys()) | set(overrides.keys())) - set(dnp_team_ids)
+        for team_id in all_team_ids:
+            placement = placements.get(team_id)  # None if no rank set yet
             override = overrides.get(team_id)
             db.execute(
                 "UPDATE game_teams SET placement=?, points_override=?, did_not_participate=0 WHERE id=? AND game_id=?",
@@ -425,7 +428,8 @@ def save_results(game_id, placements, overrides=None, dnp_team_ids=None):
             db.execute(
                 "UPDATE game_teams SET placement=NULL, points_override=NULL, did_not_participate=1 WHERE id=? AND game_id=?",
                 [team_id, game_id])
-        db.execute("UPDATE games SET status='termine' WHERE id=?", [game_id])
+        if finish:
+            db.execute("UPDATE games SET status='termine' WHERE id=?", [game_id])
         db.commit()
 
 

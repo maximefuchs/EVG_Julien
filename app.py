@@ -397,6 +397,9 @@ def admin_jeu_resultats(game_id):
         flash("Aucune équipe enregistrée pour ce jeu.", "warning")
         return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
+    # Determine whether this is a temporary save or a final finish
+    finish = request.form.get("action", "finish") == "finish"
+
     placements = {}
     overrides = {}
     dnp_team_ids = set()
@@ -407,12 +410,38 @@ def admin_jeu_resultats(game_id):
             dnp_team_ids.add(team["id"])
             continue
         val = request.form.get(f"placement_{team['id']}", "").strip()
-        if not val.isdigit() or int(val) < 1:
+        if val.isdigit() and int(val) >= 1:
+            placements[team["id"]] = int(val)
+        elif finish:
+            # Strict validation only when finishing the game
             error = f"Le placement de « {team['name']} » est invalide (doit être ≥ 1, ou cochez N'a pas participé)."
             break
-        placements[team["id"]] = int(val)
+        # For save without a placement: leave the team unranked (NULL) — no error
         ov = request.form.get(f"points_override_{team['id']}", "").strip()
         overrides[team["id"]] = int(ov) if ov.lstrip("-").isdigit() else None
+
+    # When finishing, validate that rank sequence is logically consistent:
+    # ranks must start at 1, and after k participants sharing rank r the next
+    # distinct rank must be exactly r + k  (standard competition ranking).
+    if finish and not error and placements:
+        rank_values = sorted(placements.values())
+        if rank_values[0] != 1:
+            error = "Le classement doit commencer à la 1re place."
+        else:
+            i = 0
+            while i < len(rank_values) and not error:
+                current_rank = rank_values[i]
+                j = i
+                while j < len(rank_values) and rank_values[j] == current_rank:
+                    j += 1
+                count = j - i          # how many share this rank
+                if j < len(rank_values) and rank_values[j] != current_rank + count:
+                    error = (
+                        f"Classement invalide : {count} participant(s) sont à la "
+                        f"{current_rank}e place, donc la prochaine doit être la "
+                        f"{current_rank + count}e (pas la {rank_values[j]}e)."
+                    )
+                i = j
 
     if error:
         # Re-inject submitted values into teams so the form keeps what was typed
@@ -433,8 +462,11 @@ def admin_jeu_resultats(game_id):
                                players=players, free_players=free_players,
                                score_cfg=score_cfg)
 
-    db.save_results(game_id, placements, overrides, dnp_team_ids)
-    flash("Résultats enregistrés. Le leaderboard a été mis à jour.", "success")
+    db.save_results(game_id, placements, overrides, dnp_team_ids, finish=finish)
+    if finish:
+        flash("Résultats enregistrés. Le jeu est terminé.", "success")
+    else:
+        flash("Scores sauvegardés.", "success")
     return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
 
