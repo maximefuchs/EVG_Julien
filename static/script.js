@@ -33,11 +33,15 @@
         <th class="text-center" style="width:50px;">#</th>
         <th>Joueur</th>
         <th class="text-center" style="min-width:90px;">Total</th>`;
-    const gameCols = games.map(g => `
+    const gameCols = games.map(g => {
+      const ongoingBadge = g.is_ongoing
+        ? `<span class="badge bg-warning text-dark d-block mt-1" style="font-size:.65em;">en cours</span>`
+        : "";
+      return `
         <th class="text-center lb-game-col" data-game-id="${g.id}">
-          ${escapeHtml(g.name)}
-          <div class="lb-day-label">${g.day === 'samedi' ? 'Sam.' : 'Dim.'}</div>
-        </th>`).join("");
+          ${escapeHtml(g.name)}${ongoingBadge}
+        </th>`;
+    }).join("");
     return fixed + gameCols + `
       </tr>`;
   }

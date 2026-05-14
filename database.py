@@ -128,22 +128,23 @@ def init_db():
 # ---------------------------------------------------------------------------
 
 def get_leaderboard():
-    """Return individual rankings across all games."""
+    """Return individual rankings across all visible games (finished + ongoing saved scores)."""
     with get_db() as db:
         rows = db.execute("""
             SELECT
                 p.id,
                 p.name,
-                COALESCE(SUM(CASE WHEN gt.did_not_participate = 0
-                                  THEN COALESCE(gt.points_override, sc.points, 0)
-                                  ELSE 0 END), 0) AS total_points,
+                COALESCE(SUM(CASE
+                    WHEN gt.did_not_participate = 1 THEN 0
+                    WHEN gt.placement IS NULL AND gt.points_override IS NULL THEN 0
+                    ELSE COALESCE(gt.points_override, sc.points, 0)
+                END), 0) AS total_points,
                 COUNT(DISTINCT CASE WHEN g.status = 'termine' THEN g.id END) AS games_played
             FROM players p
             LEFT JOIN team_players tp ON tp.player_id = p.id
             LEFT JOIN game_teams gt   ON gt.id = tp.team_id
-                                     AND gt.placement IS NOT NULL
             LEFT JOIN games g         ON g.id = gt.game_id
-                                     AND g.status = 'termine'
+                                     AND g.status IN ('termine', 'en_cours')
             LEFT JOIN score_config sc ON sc.game_type = g.type
                                      AND sc.placement = gt.placement
             GROUP BY p.id, p.name
@@ -161,10 +162,21 @@ def get_finished_games():
         ).fetchall()]
 
 
-def get_all_game_scores():
-    """Return {player_id: {game_id: points_or_None}} for every finished game.
+def get_all_visible_games():
+    """Return finished and ongoing games ordered by creation date, with is_ongoing flag."""
+    with get_db() as db:
+        return [dict(r) for r in db.execute(
+            "SELECT id, name, type, "
+            "       CASE WHEN status = 'en_cours' THEN 1 ELSE 0 END AS is_ongoing "
+            "FROM games "
+            "WHERE status IN ('termine', 'en_cours') ORDER BY created_at"
+        ).fetchall()]
 
-    None means the player did not participate (or had no entry for that game).
+
+def get_all_game_scores():
+    """Return {player_id: {game_id: points_or_None}} for all visible games (finished + ongoing).
+
+    None means the player did not participate, or no score has been saved yet.
     """
     with get_db() as db:
         rows = db.execute("""
@@ -173,11 +185,12 @@ def get_all_game_scores():
                 g.id  AS game_id,
                 CASE
                     WHEN gt.did_not_participate = 1 THEN NULL
+                    WHEN gt.placement IS NULL AND gt.points_override IS NULL THEN NULL
                     ELSE COALESCE(gt.points_override, sc.points, 0)
                 END AS points
             FROM team_players tp
             JOIN game_teams gt ON gt.id = tp.team_id
-            JOIN games g       ON g.id = gt.game_id AND g.status = 'termine'
+            JOIN games g       ON g.id = gt.game_id AND g.status IN ('termine', 'en_cours')
             LEFT JOIN score_config sc ON sc.game_type = g.type
                                      AND sc.placement = gt.placement
         """).fetchall()
@@ -312,6 +325,37 @@ def get_finished_games_with_results():
             """, [game["type"], game["id"]]).fetchall()
             game["results"] = [dict(r) for r in rows]
     return games
+
+
+def get_ongoing_games_with_results():
+    """Return en_cours games, each with current saved scores per participant."""
+    with get_db() as db:
+        games = [dict(r) for r in db.execute(
+            "SELECT * FROM games WHERE status='en_cours' ORDER BY created_at"
+        ).fetchall()]
+        for game in games:
+            rows = db.execute("""
+                SELECT
+                    gt.placement,
+                    gt.did_not_participate,
+                    gt.points_override,
+                    gt.name AS team_name,
+                    COALESCE(gt.points_override, sc.points, 0) AS points,
+                    GROUP_CONCAT(p.name, ', ') AS player_names
+                FROM game_teams gt
+                LEFT JOIN team_players tp ON tp.team_id = gt.id
+                LEFT JOIN players p       ON p.id = tp.player_id
+                LEFT JOIN score_config sc ON sc.game_type = ? AND sc.placement = gt.placement
+                WHERE gt.game_id = ?
+                GROUP BY gt.id
+                ORDER BY
+                    CASE WHEN gt.did_not_participate = 1 THEN 1 ELSE 0 END,
+                    COALESCE(gt.points_override, sc.points, 0) DESC,
+                    gt.placement ASC NULLS LAST
+            """, [game["type"], game["id"]]).fetchall()
+            game["results"] = [dict(r) for r in rows]
+    return games
+
 
 
 def get_game(game_id):
