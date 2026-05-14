@@ -26,6 +26,10 @@
           <a class="nav-link {% if request.endpoint == 'nba_jeu' %}active{% endif %}"
              href="{{ url_for('nba_jeu') }}">🏀 NBA</a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'mesures_jeu' %}active{% endif %}"
+             href="{{ url_for('mesures_jeu') }}">📏 Mesures</a>
+        </li>
       </ul>
       <ul class="navbar-nav ms-auto">
         {% if session.get('admin_id') %}

@@ -435,3 +435,127 @@ a:hover { color: #ffd966; text-decoration: none; }
   .nba-guess-table td { font-size: 0.75rem; padding: 6px 4px; }
   .nba-player-name { min-width: 100px; }
 }
+
+/* =========================================================
+   Défi Mesures
+   ========================================================= */
+
+.mesures-title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--gold);
+  letter-spacing: 2px;
+}
+
+/* Mode selector */
+.mesures-mode-group .mesures-mode-btn {
+  background-color: #0f0f23;
+  border-color: #2a2a4a;
+  color: #bbb;
+  font-weight: 600;
+  transition: background 0.15s, color 0.15s;
+}
+.mesures-mode-group .mesures-mode-btn:hover {
+  background-color: #1e1e3a;
+  color: #fff;
+}
+.mesures-mode-group .mesures-mode-btn.active {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Unit toggle inside settings */
+.mesures-unit-btn {
+  font-weight: 700 !important;
+}
+.mesures-unit-btn.active {
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+}
+
+/* Generate button */
+.mesures-generate-btn {
+  font-size: 1.3rem;
+  font-weight: 800;
+  padding: 14px 48px;
+  border-radius: 50px;
+  letter-spacing: 2px;
+  transition: transform 0.1s;
+}
+.mesures-generate-btn:active {
+  transform: scale(0.97);
+}
+
+@keyframes mesures-btn-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.07); }
+  100% { transform: scale(1); }
+}
+.mesures-btn-pop {
+  animation: mesures-btn-pop 0.25s ease;
+}
+
+/* Result cards */
+@keyframes mesures-result-pop {
+  0%   { opacity: 0; transform: scale(0.8) translateY(10px); }
+  60%  { transform: scale(1.05) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.mesures-result-card {
+  background: linear-gradient(135deg, #0f0f23, #1a1a3a);
+  border: 2px solid var(--accent);
+  border-radius: 20px;
+  padding: 28px 40px;
+  text-align: center;
+  min-width: 160px;
+}
+.mesures-result-pop {
+  animation: mesures-result-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.mesures-result-icon {
+  font-size: 2rem;
+  margin-bottom: 6px;
+}
+.mesures-result-number {
+  font-size: 3.5rem;
+  font-weight: 900;
+  color: var(--gold);
+  line-height: 1;
+  letter-spacing: -1px;
+}
+.mesures-result-unit {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/* History */
+.mesures-history-item {
+  background-color: #0f0f23;
+  border: 1px solid #2a2a4a;
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 0.85rem;
+  color: #aaa;
+  white-space: nowrap;
+}
+.mesures-history-latest {
+  border-color: var(--accent);
+  color: #e0e0e0;
+  font-weight: 600;
+}
+
+/* Range inputs */
+.mesures-range-input {
+  text-align: center;
+}
+
+@media (max-width: 576px) {
+  .mesures-result-number { font-size: 2.8rem; }
+  .mesures-generate-btn  { font-size: 1.1rem; padding: 12px 32px; }
+}
