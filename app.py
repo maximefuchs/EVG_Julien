@@ -397,6 +397,9 @@ def admin_jeu_resultats(game_id):
         flash("Aucune équipe enregistrée pour ce jeu.", "warning")
         return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
+    # Determine whether this is a temporary save or a final finish
+    finish = request.form.get("action", "finish") == "finish"
+
     placements = {}
     overrides = {}
     dnp_team_ids = set()
@@ -407,10 +410,13 @@ def admin_jeu_resultats(game_id):
             dnp_team_ids.add(team["id"])
             continue
         val = request.form.get(f"placement_{team['id']}", "").strip()
-        if not val.isdigit() or int(val) < 1:
+        if val.isdigit() and int(val) >= 1:
+            placements[team["id"]] = int(val)
+        elif finish:
+            # Strict validation only when finishing the game
             error = f"Le placement de « {team['name']} » est invalide (doit être ≥ 1, ou cochez N'a pas participé)."
             break
-        placements[team["id"]] = int(val)
+        # For save without a placement: leave the team unranked (NULL) — no error
         ov = request.form.get(f"points_override_{team['id']}", "").strip()
         overrides[team["id"]] = int(ov) if ov.lstrip("-").isdigit() else None
 
@@ -433,8 +439,11 @@ def admin_jeu_resultats(game_id):
                                players=players, free_players=free_players,
                                score_cfg=score_cfg)
 
-    db.save_results(game_id, placements, overrides, dnp_team_ids)
-    flash("Résultats enregistrés. Le leaderboard a été mis à jour.", "success")
+    db.save_results(game_id, placements, overrides, dnp_team_ids, finish=finish)
+    if finish:
+        flash("Résultats enregistrés. Le jeu est terminé.", "success")
+    else:
+        flash("Scores sauvegardés.", "success")
     return redirect(url_for("admin_jeu_detail", game_id=game_id))
 
 
