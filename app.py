@@ -74,27 +74,27 @@ def login_required(f):
 
 @app.route("/")
 def index():
-    leaderboard    = _add_ranks(db.get_leaderboard())
-    finished_games = db.get_finished_games()
-    game_scores    = db.get_all_game_scores()
+    leaderboard   = _add_ranks(db.get_leaderboard())
+    visible_games = db.get_all_visible_games()
+    game_scores   = db.get_all_game_scores()
     return render_template("index.html",
                            leaderboard=leaderboard,
-                           finished_games=finished_games,
+                           finished_games=visible_games,
                            game_scores=game_scores)
 
 
 @app.route("/api/leaderboard")
 def api_leaderboard():
-    leaderboard    = _add_ranks(db.get_leaderboard())
-    finished_games = db.get_finished_games()
-    game_scores    = db.get_all_game_scores()
+    leaderboard   = _add_ranks(db.get_leaderboard())
+    visible_games = db.get_all_visible_games()
+    game_scores   = db.get_all_game_scores()
     # Embed per-game scores into each leaderboard entry (JSON keys must be strings)
     for entry in leaderboard:
         entry["game_scores"] = {
             str(gid): pts
             for gid, pts in game_scores.get(entry["id"], {}).items()
         }
-    return jsonify({"leaderboard": leaderboard, "games": finished_games})
+    return jsonify({"leaderboard": leaderboard, "games": visible_games})
 
 
 @app.route("/joueur/<int:player_id>")
@@ -162,10 +162,12 @@ def admin_dashboard():
     en_cours = [g for g in games if g["status"] == "en_cours"]
     total_players = len(db.get_all_players())
     finished_games = db.get_finished_games_with_results()
+    ongoing_games  = db.get_ongoing_games_with_results()
     return render_template("admin/dashboard.html",
                            top5=top5, games=games, en_cours=en_cours,
                            total_players=total_players,
-                           finished_games=finished_games)
+                           finished_games=finished_games,
+                           ongoing_games=ongoing_games)
 
 
 # ---------------------------------------------------------------------------
