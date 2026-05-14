@@ -420,6 +420,29 @@ def admin_jeu_resultats(game_id):
         ov = request.form.get(f"points_override_{team['id']}", "").strip()
         overrides[team["id"]] = int(ov) if ov.lstrip("-").isdigit() else None
 
+    # When finishing, validate that rank sequence is logically consistent:
+    # ranks must start at 1, and after k participants sharing rank r the next
+    # distinct rank must be exactly r + k  (standard competition ranking).
+    if finish and not error and placements:
+        rank_values = sorted(placements.values())
+        if rank_values[0] != 1:
+            error = "Le classement doit commencer à la 1re place."
+        else:
+            i = 0
+            while i < len(rank_values) and not error:
+                current_rank = rank_values[i]
+                j = i
+                while j < len(rank_values) and rank_values[j] == current_rank:
+                    j += 1
+                count = j - i          # how many share this rank
+                if j < len(rank_values) and rank_values[j] != current_rank + count:
+                    error = (
+                        f"Classement invalide : {count} participant(s) sont à la "
+                        f"{current_rank}e place, donc la prochaine doit être la "
+                        f"{current_rank + count}e (pas la {rank_values[j]}e)."
+                    )
+                i = j
+
     if error:
         # Re-inject submitted values into teams so the form keeps what was typed
         for team in teams:
