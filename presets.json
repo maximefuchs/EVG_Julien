@@ -18,7 +18,7 @@
   ],
   "distributions": [
     {
-      "label": "Répartition A — 5 équipes de 3",
+      "label": "Samedi matin — 5 équipes de 3",
       "teams": [
         { "name": "Équipe 1", "players": ["Nathan",      "Corentin H",  "Marc"      ] },
         { "name": "Équipe 2", "players": ["Emile",       "Timothé",     "Maxime G"  ] },
@@ -28,7 +28,7 @@
       ]
     },
     {
-      "label": "Répartition B — 5 équipes de 3",
+      "label": "Samedi après-midi — 5 équipes de 3",
       "teams": [
         { "name": "Équipe 1", "players": ["Corentin DK", "Maxime F",    "Nathan"    ] },
         { "name": "Équipe 2", "players": ["Antoine",     "Corentin H",  "Emile"     ] },
@@ -38,7 +38,7 @@
       ]
     },
     {
-      "label": "Répartition C — 5 équipes de 3",
+      "label": "Culture Générale — 5 équipes de 3",
       "teams": [
         { "name": "Équipe 1", "players": ["Florian",     "Marc",        "Maxime G"  ] },
         { "name": "Équipe 2", "players": ["Thibaut",     "Corentin DK", "Julien"    ] },
@@ -48,7 +48,7 @@
       ]
     },
     {
-      "label": "Répartition D — 3 équipes de 5",
+      "label": "Autre — 3 équipes de 5",
       "teams": [
         { "name": "Équipe 1", "players": ["Alexandre",   "Antoine",     "Auxence",    "Julien",  "Corentin H"  ] },
         { "name": "Équipe 2", "players": ["Corentin DK", "Emile",       "Florian",    "Marc",    "Maxime F"    ] },
